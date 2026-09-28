@@ -1,0 +1,162 @@
+﻿@page "/perfil"
+@using MarketLocalShirts.DTOs
+@using MarketLocalShirts.Service.Auth
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Mi Perfil - MarketLocalShirts</PageTitle>
+
+<div class="container my-5 text-white">
+    <h1 class="text-center mb-5 fw-bold display-4">Mi Perfil</h1>
+
+    @if (cargando)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-info" role="status">
+                <span class="visually-hidden">Cargando perfil desde la API...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row justify-content-center g-5">
+            <!-- Columna Izquierda: Datos del Usuario -->
+            <div class="col-md-6">
+                <h3 class="fw-bold mb-4">Datos</h3>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold fs-5">Nombre</label>
+                    <input type="text" 
+                           class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                           @bind="usuario.Nombre" 
+                           placeholder="Tu nombre completo" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold fs-5">Correo</label>
+                    <input type="email" 
+                           class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                           @bind="usuario.Correo" 
+                           placeholder="correo@ejemplo.com" />
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold fs-5">Teléfono</label>
+                    <input type="text" 
+                           class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                           @bind="usuario.Telefono" 
+                           placeholder="0000-0000" />
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Contraseña y Cerrar Sesión -->
+            <div class="col-md-5 d-flex flex-column justify-content-start pt-md-4">
+                <div class="mb-5">
+                    <h3 class="fw-bold mb-3">Contraseña</h3>
+                    <p class="fs-5 mb-3 text-white-50">
+                        Te enviaremos un enlace a tu correo
+                    </p>
+                    <button class="btn btn-info text-white fw-bold px-4 py-3 fs-5 w-100" 
+                            @onclick="EnviarEnlaceContrasena">
+                        Enviar Enlace
+                    </button>
+                </div>
+
+                <div class="mt-2">
+                    <button class="btn btn-danger text-white fw-bold px-4 py-3 fs-5 w-100" 
+                            @onclick="CerrarSesion">
+                        Cerrar Sesión
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botón Guardar Centrado -->
+        <div class="row mt-5">
+            <div class="col-12 text-center">
+                <button class="btn btn-info text-white fw-bold px-5 py-3 fs-4" 
+                        style="min-width: 280px;" 
+                        @onclick="GuardarCambios">
+                    Guardar
+                </button>
+            </div>
+        </div>
+
+        <!-- Mensaje de Estado -->
+        @if (!string.IsNullOrEmpty(mensaje))
+        {
+            <div class="row mt-4">
+                <div class="col-12 text-center">
+                    <div class="alert alert-info d-inline-block px-4 py-2 fs-5" role="alert">
+                        @mensaje
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private PerfilUsuarioDTO usuario = new();
+    private bool cargando = true;
+    private string mensaje = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarPerfilDesdeApi();
+    }
+
+    private async Task CargarPerfilDesdeApi()
+    {
+        cargando = true;
+        try
+        {
+            // Llama directamente a api/usuarios/perfil
+            var perfilRemoto = await AuthService.ObtenerPerfilRealAsync();
+            
+            if (perfilRemoto != null)
+            {
+                usuario = perfilRemoto;
+            }
+            else
+            {
+                mensaje = "No se pudo cargar el perfil desde la API. Inicia sesión nuevamente.";
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = "Error al conectar con la API: " + ex.Message;
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private async Task GuardarCambios()
+    {
+        mensaje = "Guardando cambios en la base de datos...";
+        
+        bool exito = await AuthService.ActualizarPerfilRealAsync(usuario);
+        
+        if (exito)
+        {
+            mensaje = "¡Perfil actualizado exitosamente en la base de datos!";
+        }
+        else
+        {
+            mensaje = "Ocurrió un error al guardar los cambios en el servidor.";
+        }
+    }
+
+    private void EnviarEnlaceContrasena()
+    {
+        mensaje = $"Se ha enviado el enlace de restablecimiento a {usuario.Correo}.";
+    }
+
+    private async Task CerrarSesion()
+    {
+        await AuthService.Logout();
+        Navigation.NavigateTo("/login");
+    }
+}

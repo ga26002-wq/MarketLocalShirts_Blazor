@@ -1,0 +1,152 @@
+﻿@page "/carrito"
+@using MarketLocalShirts.DTOs
+@using MarketLocalShirts.Service.Carrito
+@inject CarritoService CarritoService
+@inject NavigationManager Navigation
+
+<PageTitle>Carrito - MarketLocalShirts</PageTitle>
+
+<div class="container my-5 text-white">
+    <h1 class="text-center mb-5 fw-bold display-4">Carrito</h1>
+
+    @if (cargando)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-info" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive rounded shadow-sm">
+            <table class="table table-dark table-hover align-middle mb-0 text-center">
+                <thead class="table-light text-dark fs-5">
+                    <tr>
+                        <th class="text-start ps-4">Producto</th>
+                        <th>Precio</th>
+                        <th style="width: 160px;">Cant.</th>
+                        <th>SubTotal</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="fs-5">
+                    @if (itemsCarrito != null && itemsCarrito.Any())
+                    {
+                        @foreach (var item in itemsCarrito)
+                        {
+                            <tr>
+                                <td class="text-start ps-4 fw-semibold">@item.NombreProducto</td>
+                                <td>$@item.Precio.ToString("F2")</td>
+                                <td>
+                                    <div class="input-group justify-content-center">
+                                        <input type="number" 
+                                               class="form-control text-center bg-secondary text-white border-0 fw-bold" 
+                                               @bind="item.Cantidad" 
+                                               min="1" 
+                                               style="max-width: 70px;" />
+                                        <button class="btn btn-info text-white fw-bold px-3" 
+                                                @onclick="() => ActualizarCantidad(item.Id, item.Cantidad)">OK</button>
+                                    </div>
+                                </td>
+                                <td class="fw-bold">$@item.SubTotal.ToString("F2")</td>
+                                <td>
+                                    <button class="btn btn-info text-white fw-bold px-4" 
+                                            @onclick="() => EliminarProducto(item.Id)">Quitar</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted fs-4">
+                                Tu carrito está vacío.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Total y Navegación -->
+        <div class="row align-items-center mt-5">
+            <div class="col-md-6 mb-3 mb-md-0">
+                <h2 class="fw-bold m-0">Total: $@CalcularTotal().ToString("F2")</h2>
+            </div>
+            <div class="col-md-6 d-flex justify-content-md-end gap-3">
+                <button class="btn btn-info text-white fw-bold px-4 py-2 fs-5" @onclick="SeguirComprando">Seguir</button>
+                <button class="btn btn-info text-white fw-bold px-4 py-2 fs-5" 
+                        @onclick="Pagar" 
+                        disabled="@(itemsCarrito == null || !itemsCarrito.Any())">Pagar</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<CarritoDTO> itemsCarrito = new();
+    private bool cargando = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarCarrito();
+    }
+
+    private async Task CargarCarrito()
+    {
+        cargando = true;
+        try
+        {
+            itemsCarrito = await CarritoService.ObtenerCarritoAsync();
+        }
+        catch (Exception)
+        {
+            // Si la API falla o está apagada, mantenemos la lista limpia sin romper la app
+            itemsCarrito = new List<CarritoDTO>();
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private decimal CalcularTotal()
+    {
+        return itemsCarrito?.Sum(x => x.SubTotal) ?? 0m;
+    }
+
+    private async Task ActualizarCantidad(int idItem, int nuevaCantidad)
+    {
+        if (nuevaCantidad < 1) return;
+        
+        bool exito = await CarritoService.ActualizarCantidadAsync(idItem, nuevaCantidad);
+        if (exito)
+        {
+            await CargarCarrito();
+        }
+    }
+
+    private async Task EliminarProducto(int idItem)
+    {
+        bool exito = await CarritoService.EliminarDelCarritoAsync(idItem);
+        if (exito)
+        {
+            await CargarCarrito();
+        }
+    }
+
+    private void SeguirComprando()
+    {
+        Navigation.NavigateTo("/catalogo");
+    }
+
+    private async Task Pagar()
+    {
+        bool exito = await CarritoService.ProcesarPagoAsync();
+        if (exito)
+        {
+            Navigation.NavigateTo("/mis-pedidos");
+        }
+    }
+}

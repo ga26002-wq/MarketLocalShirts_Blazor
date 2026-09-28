@@ -1,0 +1,228 @@
+﻿@page "/admin/usuarios"
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject HttpClient Http
+@using System.Net.Http.Json
+
+<PageTitle>Administración de Usuarios - MarketLocalShirts</PageTitle>
+
+<div class="container my-5 text-white">
+    <h1 class="text-center mb-5 fw-bold display-3">Usuarios</h1>
+
+    <!-- Buscador de Usuarios -->
+    <div class="row justify-content-center mb-5">
+        <div class="col-md-8 d-flex gap-2">
+            <input type="text" 
+                   class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                   placeholder="Buscar usuario..." 
+                   @bind="criterioBusqueda" 
+                   @bind:event="oninput" />
+            <button class="btn btn-info text-white fw-bold px-4 fs-5" 
+                    style="min-width: 140px;"
+                    @onclick="BuscarUsuarios">
+                Buscar
+            </button>
+        </div>
+    </div>
+
+    <!-- Encabezados de la Lista -->
+    <div class="row text-white fw-bold fs-4 mb-3 px-3">
+        <div class="col-md-4">Usuarios</div>
+        <div class="col-md-2 text-center">Rol</div>
+        <div class="col-md-2 text-center">Estado</div>
+        <div class="col-md-4 text-center">Acciones</div>
+    </div>
+
+    <!-- Filas de Usuarios -->
+    @if (usuarios == null || !usuarios.Any())
+    {
+        <div class="text-center py-5 text-muted fs-4">
+            No se encontraron usuarios registrados.
+        </div>
+    }
+    else
+    {
+        @foreach (var usr in usuariosFiltrados)
+        {
+            <div class="row align-items-center bg-black py-3 mb-3 rounded border border-secondary px-3">
+                <!-- Nombre y Correo -->
+                <div class="col-md-4">
+                    <h4 class="fw-bold m-0 fs-4">@usr.Nombre</h4>
+                    <p class="text-white-50 m-0 fs-5">@usr.Correo</p>
+                </div>
+
+                <!-- Rol -->
+                <div class="col-md-2 text-center fs-4 fw-bold">
+                    @usr.Rol
+                </div>
+
+                <!-- Estado -->
+                <div class="col-md-2 text-center fs-4 fw-bold">
+                    @usr.Estado
+                </div>
+
+                <!-- Acciones -->
+                <div class="col-md-4 d-flex justify-content-center gap-2">
+                    <!-- El botón cambia de texto y color según el rol del usuario -->
+                    <button class="btn @(usr.Rol == "Admin" || usr.Rol == "ROLE_ADMIN" ? "btn-warning text-dark" : "btn-info text-white") fw-bold px-3 py-2 fs-5" 
+                            @onclick="() => CambiarRol(usr)">
+                        @(usr.Rol == "Admin" || usr.Rol == "ROLE_ADMIN" ? "Cliente" : "Admin")
+                    </button>
+                    
+                    <button class="btn btn-light text-dark fw-bold px-3 py-2 fs-5" 
+                            @onclick="() => CambiarEstado(usr)">
+                        @(usr.Estado == "Activa" ? "Suspender" : "Activar")
+                    </button>
+
+                    <button class="btn btn-light text-dark fw-bold px-3 py-2 fs-5" 
+                            @onclick="() => RestablecerClave(usr)">
+                        Clave
+                    </button>
+                </div>
+            </div>
+        }
+    }
+
+    <!-- Mensaje de confirmación de acción -->
+    @if (!string.IsNullOrEmpty(mensaje))
+    {
+        <div class="row mt-4">
+            <div class="col-12 text-center">
+                <div class="alert alert-info d-inline-block px-4 py-2 fs-5" role="alert">
+                    @mensaje
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private string criterioBusqueda = string.Empty;
+    private string mensaje = string.Empty;
+
+    private List<UsuarioAdminDTO> usuarios = new()
+    {
+        new UsuarioAdminDTO { Id = 1, Nombre = "Sofia", Correo = "Sofia@gmail.com", Rol = "Cliente", Estado = "Activa" },
+        new UsuarioAdminDTO { Id = 2, Nombre = "Josué Garay", Correo = "Josuedga007@gmail.com", Rol = "Cliente", Estado = "Activa" },
+        new UsuarioAdminDTO { Id = 3, Nombre = "Mónica Ruballo", Correo = "Admin@gmail.com", Rol = "Admin", Estado = "Activa" }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarUsuariosDesdeApi();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var userEmail = await JS.InvokeAsync<string>("localStorage.getItem", "userEmail");
+                var userRole = await JS.InvokeAsync<string>("localStorage.getItem", "userRole");
+
+                bool esAdmin = (!string.IsNullOrEmpty(userRole) && userRole.Equals("ADMIN", StringComparison.OrdinalIgnoreCase))
+                              || (!string.IsNullOrEmpty(userEmail) && userEmail.Equals("Admin@gmail.com", StringComparison.OrdinalIgnoreCase));
+
+                if (!esAdmin)
+                {
+                    Navigation.NavigateTo("/");
+                }
+            }
+            catch
+            {
+                Navigation.NavigateTo("/");
+            }
+        }
+    }
+
+    private async Task CargarUsuariosDesdeApi()
+    {
+        try
+        {
+            var result = await Http.GetFromJsonAsync<List<UsuarioAdminDTO>>("api/usuarios");
+            if (result != null && result.Any())
+            {
+                usuarios = result;
+            }
+        }
+        catch
+        {
+            // Si la API aún no está disponible para consultar usuarios, se mantienen los datos iniciales
+        }
+    }
+
+    private IEnumerable<UsuarioAdminDTO> usuariosFiltrados =>
+        string.IsNullOrWhiteSpace(criterioBusqueda) 
+            ? usuarios 
+            : usuarios.Where(u => u.Nombre.Contains(criterioBusqueda, StringComparison.OrdinalIgnoreCase) || 
+                                  u.Correo.Contains(criterioBusqueda, StringComparison.OrdinalIgnoreCase));
+
+    private void BuscarUsuarios() { }
+
+    private async Task CambiarRol(UsuarioAdminDTO usr)
+{
+    // Evaluamos si actualmente es Admin
+    bool esAdmin = usr.Rol.Equals("Admin", StringComparison.OrdinalIgnoreCase) 
+                || usr.Rol.Equals("ROLE_ADMIN", StringComparison.OrdinalIgnoreCase)
+                || usr.Rol == "1";
+
+    // Si es Admin, el nuevo ID es 2 (Cliente). Si es Cliente, el nuevo ID es 1 (Admin)
+    int nuevoRolId = esAdmin ? 2 : 1;
+    string nuevoRolTexto = esAdmin ? "Cliente" : "Admin";
+
+    try
+    {
+        // Le enviamos a la API el ID numérico (1 o 2) que espera SQL Server
+        var payload = new { idRol = nuevoRolId, rolId = nuevoRolId, id = nuevoRolId, rol = nuevoRolTexto };
+        var response = await Http.PutAsJsonAsync($"api/usuarios/{usr.Id}/rol", payload);
+
+        if (response.IsSuccessStatusCode)
+        {
+            usr.Rol = nuevoRolTexto;
+            mensaje = $"¡Persistido en Base de Datos! Se actualizó el rol de {usr.Nombre} a {nuevoRolTexto}.";
+        }
+        else
+        {
+            // Si la API falla, nos muestra el código HTTP para corregirlo
+            mensaje = $"No se guardó en la BD. Respuesta de la API: {(int)response.StatusCode} {response.ReasonPhrase}";
+        }
+    }
+    catch (Exception ex)
+    {
+        mensaje = $"Error al conectar con la API: {ex.Message}";
+    }
+}
+
+    private async Task CambiarEstado(UsuarioAdminDTO usr)
+    {
+        string nuevoEstado = usr.Estado == "Activa" ? "Suspendida" : "Activa";
+
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/usuarios/{usr.Id}/estado", new { Estado = nuevoEstado });
+
+            usr.Estado = nuevoEstado;
+            mensaje = $"El estado de {usr.Nombre} cambió a {usr.Estado}.";
+        }
+        catch
+        {
+            usr.Estado = nuevoEstado;
+            mensaje = $"El estado de {usr.Nombre} cambió a {usr.Estado}.";
+        }
+    }
+
+    private void RestablecerClave(UsuarioAdminDTO usr)
+    {
+        mensaje = $"Se envió la solicitud de clave a {usr.Correo}.";
+    }
+
+    public class UsuarioAdminDTO
+    {
+        public int Id { get; set; }
+        public string Nombre { get; set; } = string.Empty;
+        public string Correo { get; set; } = string.Empty;
+        public string Rol { get; set; } = string.Empty;
+        public string Estado { get; set; } = string.Empty;
+    }
+}

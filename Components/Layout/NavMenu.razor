@@ -1,0 +1,101 @@
+﻿@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4 border-bottom border-secondary py-3 w-100">
+    <div class="container-fluid d-flex align-items-center justify-content-between">
+        <!-- Logo -->
+        <a class="navbar-brand fw-bold text-white fs-4 d-flex align-items-center m-0" href="/">
+            <span style="color: #00a8ff;" class="me-1">MLS</span> MarketLocalShirts
+        </a>
+
+        <!-- Enlaces a la derecha -->
+        <div class="d-flex align-items-center gap-3 gap-md-4">
+            @if (isLoggedIn)
+            {
+                @if (isAdmin)
+                {
+                    <!-- Menú Exclusivo Administrador -->
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="admin/usuarios">Usuarios</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="admin/productos">Productos</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="admin/marcas">Marcas</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="admin/pedidos">Pedidos</NavLink>
+                }
+                else
+                {
+                    <!-- Menú Cliente Normal -->
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="" Match="NavLinkMatch.All">Inicio</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="catalogo">Catálogo</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="carrito">Carrito</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="mis-pedidos">Mis Pedidos</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="perfil">Mi Perfil</NavLink>
+                }
+
+                <button class="btn btn-danger btn-sm px-3 py-1 ms-2 rounded-2 fw-semibold" @onclick="CerrarSesion">Cerrar Sesión</button>
+            }
+            else
+            {
+                <NavLink class="text-white text-decoration-none small fw-semibold" href="" Match="NavLinkMatch.All">Inicio</NavLink>
+                <NavLink class="text-white text-decoration-none small fw-semibold" href="catalogo">Catálogo</NavLink>
+                <NavLink class="text-white text-decoration-none small fw-semibold" href="login">Iniciar Sesión</NavLink>
+                <NavLink class="text-white text-decoration-none small fw-semibold" href="registro">Registrarse</NavLink>
+            }
+        </div>
+    </div>
+</nav>
+
+@code {
+    private bool isLoggedIn = false;
+    private bool isAdmin = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await VerificarSesionYRol();
+        }
+    }
+
+    private async Task VerificarSesionYRol()
+    {
+        try
+        {
+            var token = await JS.InvokeAsync<string>("localStorage.getItem", "authToken");
+            var userEmail = await JS.InvokeAsync<string>("localStorage.getItem", "userEmail");
+            var userRole = await JS.InvokeAsync<string>("localStorage.getItem", "userRole");
+
+            isLoggedIn = !string.IsNullOrEmpty(token);
+
+            if (isLoggedIn)
+            {
+                isAdmin = (!string.IsNullOrEmpty(userRole) && userRole.Equals("ADMIN", StringComparison.OrdinalIgnoreCase))
+                          || (!string.IsNullOrEmpty(userEmail) && userEmail.Equals("Admin@gmail.com", StringComparison.OrdinalIgnoreCase));
+            }
+            else
+            {
+                isAdmin = false;
+            }
+
+            StateHasChanged();
+        }
+        catch
+        {
+            isLoggedIn = false;
+            isAdmin = false;
+        }
+    }
+
+    private async Task CerrarSesion()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.removeItem", "authToken");
+            await JS.InvokeVoidAsync("localStorage.removeItem", "userEmail");
+            await JS.InvokeVoidAsync("localStorage.removeItem", "userRole");
+        }
+        catch { }
+
+        isLoggedIn = false;
+        isAdmin = false;
+        Navigation.NavigateTo("/login", forceLoad: true);
+    }
+}

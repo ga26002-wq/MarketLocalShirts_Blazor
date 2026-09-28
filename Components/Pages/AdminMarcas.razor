@@ -1,0 +1,358 @@
+﻿@page "/admin/marcas"
+@using MarketLocalShirts.Models
+@using MarketLocalShirts.Service.Auth
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@inject HttpClient Http
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Administración de Marcas - MarketLocalShirts</PageTitle>
+
+<div class="container my-5 text-white">
+
+    @if (!mostrarFormulario)
+    {
+        <!-- ========================================== -->
+        <!--   VISTA 1: TABLA / LISTADO DE MARCAS      -->
+        <!-- ========================================== -->
+        <div class="d-flex justify-content-between align-items-center mb-5">
+            <h1 class="fw-bold display-3 m-0">Marcas</h1>
+            <button class="btn btn-info text-white fw-bold px-4 py-3 fs-4 rounded-3" 
+                    style="background-color: #00a8ff; border: none; min-width: 180px;" 
+                    @onclick="AbrirFormularioNueva">
+                Agregar Marca
+            </button>
+        </div>
+
+        <!-- Encabezados -->
+        <div class="row text-white fw-bold fs-4 mb-3 px-3">
+            <div class="col-md-6">Nombre</div>
+            <div class="col-md-6 text-end pe-5">Acciones</div>
+        </div>
+
+        <!-- Listado de Marcas -->
+        @if (cargando)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-info" role="status">
+                    <span class="visually-hidden">Cargando marcas desde la API...</span>
+                </div>
+            </div>
+        }
+        else if (marcas == null || !marcas.Any())
+        {
+            <div class="text-center py-5 text-white-50 fs-4">
+                No hay marcas registradas en la base de datos.
+            </div>
+        }
+        else
+        {
+            @foreach (var m in marcas)
+            {
+                <div class="row align-items-center bg-black py-3 mb-3 rounded border border-secondary px-3">
+                    <div class="col-md-6">
+                        <h3 class="fw-bold m-0 fs-3">@m.Nombre</h3>
+                    </div>
+
+                    <div class="col-md-6 d-flex justify-content-end gap-3 pe-4">
+                        <button class="btn btn-warning text-dark fw-bold px-4 py-2 fs-4" 
+                                style="background-color: #d4af37; border: none; min-width: 130px;"
+                                @onclick="() => AbrirFormularioEditar(m)">
+                            Editar
+                        </button>
+                        <button class="btn btn-danger text-white fw-bold px-4 py-2 fs-4" 
+                                style="background-color: #ff0000; border: none; min-width: 130px;"
+                                @onclick="() => SolicitarConfirmacionEliminar(m)">
+                            Eliminar
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+    }
+    else
+    {
+        <!-- ========================================== -->
+        <!--  VISTA 2: FORMULARIO CREAR / EDITAR MARCA  -->
+        <!-- ========================================== -->
+        <div class="d-flex justify-content-between align-items-center mb-5">
+            <h1 class="fw-bold display-3 m-0">
+                @(marcaEdicion.Id == 0 ? "Nueva Marca" : "Editar Marca")
+            </h1>
+            <button class="btn btn-info text-white fw-bold px-4 py-3 fs-4 rounded-3" 
+                    style="background-color: #00a8ff; border: none; min-width: 160px;" 
+                    @onclick="CancelarFormulario">
+                Volver
+            </button>
+        </div>
+
+        <div class="row justify-content-center my-5">
+            <div class="col-md-8">
+                <div class="mb-4">
+                    <label class="form-label fw-bold fs-3">Nombre de la Marca</label>
+                    <input type="text" 
+                           class="form-control bg-secondary text-white border-0 fs-4 p-3" 
+                           @bind="marcaEdicion.Nombre" 
+                           placeholder="Ej: Adidas, Nike, Puma..." />
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold fs-3">Descripción (Opcional)</label>
+                    <textarea class="form-control bg-secondary text-white border-0 fs-4 p-3" 
+                              rows="3" 
+                              @bind="marcaEdicion.Descripcion" 
+                              placeholder="Descripción breve de la marca"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botones Inferiores Centrados -->
+        <div class="row mt-5">
+            <div class="col-12 d-flex justify-content-center gap-4">
+                <button class="btn btn-info text-white fw-bold px-5 py-3 fs-3 rounded-2" 
+                        style="background-color: #00a8ff; border: none; min-width: 220px;" 
+                        @onclick="GuardarMarca">
+                    Guardar
+                </button>
+                <button class="btn btn-light text-dark fw-bold px-5 py-3 fs-3 rounded-2" 
+                        style="min-width: 220px;" 
+                        @onclick="CancelarFormulario">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    }
+
+    <!-- Mensajes de Feedback -->
+    @if (!string.IsNullOrEmpty(mensaje))
+    {
+        <div class="row mt-4">
+            <div class="col-12 text-center">
+                <div class="alert alert-info d-inline-block px-4 py-2 fs-5" role="alert">
+                    @mensaje
+                </div>
+            </div>
+        </div>
+    }
+
+</div>
+
+<!-- MODAL DE CONFIRMACIÓN DE ELIMINACIÓN -->
+@if (mostrarModalConfirmacion)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.85);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-white border border-secondary p-3">
+                <div class="modal-header border-0 pb-0">
+                    <h4 class="modal-title fw-bold text-danger">⚠️ Confirmar eliminación</h4>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CancelarEliminacion"></button>
+                </div>
+                <div class="modal-body py-4 fs-4 text-center">
+                    ¿Estás seguro de que deseas eliminar la marca <strong class="text-info">"@marcaAEliminar?.Nombre"</strong>?
+                    <p class="fs-6 text-white-50 mt-2 m-0">Esta acción no se puede deshacer en la base de datos.</p>
+                </div>
+                <div class="modal-footer border-0 d-flex justify-content-center gap-3">
+                    <button type="button" class="btn btn-danger fw-bold px-4 py-2 fs-5" @onclick="ConfirmarEliminarMarca">
+                        Sí, eliminar
+                    </button>
+                    <button type="button" class="btn btn-secondary fw-bold px-4 py-2 fs-5" @onclick="CancelarEliminacion">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<MarcaDTO> marcas = new();
+    private string mensaje = string.Empty;
+    private bool cargando = true;
+    private bool mostrarFormulario = false;
+
+    // Control para el Modal de Confirmación
+    private bool mostrarModalConfirmacion = false;
+    private MarcaDTO? marcaAEliminar = null;
+
+    private MarcaDTO marcaEdicion = new();
+    private const string ApiBaseUrl = "http://localhost:8080/api/marcas";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarMarcasDesdeApi();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var userEmail = await JS.InvokeAsync<string>("localStorage.getItem", "userEmail");
+                var userRole = await JS.InvokeAsync<string>("localStorage.getItem", "userRole");
+
+                bool esAdmin = (!string.IsNullOrEmpty(userRole) && userRole.Equals("ADMIN", StringComparison.OrdinalIgnoreCase))
+                              || (!string.IsNullOrEmpty(userEmail) && userEmail.Equals("Admin@gmail.com", StringComparison.OrdinalIgnoreCase));
+
+                if (!esAdmin)
+                {
+                    Navigation.NavigateTo("/");
+                }
+            }
+            catch
+            {
+                Navigation.NavigateTo("/");
+            }
+        }
+    }
+
+    private async Task CargarMarcasDesdeApi()
+    {
+        cargando = true;
+        try
+        {
+            await AuthService.GetToken();
+            var jsonString = await Http.GetStringAsync(ApiBaseUrl);
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+            if (!string.IsNullOrWhiteSpace(jsonString))
+            {
+                if (jsonString.TrimStart().StartsWith("["))
+                {
+                    var lista = JsonSerializer.Deserialize<List<MarcaDTO>>(jsonString, options);
+                    if (lista != null) marcas = lista;
+                }
+                else
+                {
+                    var wrapper = JsonSerializer.Deserialize<PageResponseWrapper>(jsonString, options);
+                    if (wrapper?.Content != null) marcas = wrapper.Content;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Nota al cargar marcas: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private void AbrirFormularioNueva()
+    {
+        marcaEdicion = new MarcaDTO();
+        mostrarFormulario = true;
+        mensaje = string.Empty;
+    }
+
+    private void AbrirFormularioEditar(MarcaDTO m)
+    {
+        marcaEdicion = new MarcaDTO
+        {
+            Id = m.Id,
+            Nombre = m.Nombre,
+            Descripcion = m.Descripcion
+        };
+        mostrarFormulario = true;
+        mensaje = string.Empty;
+    }
+
+    private void CancelarFormulario()
+    {
+        mostrarFormulario = false;
+        mensaje = string.Empty;
+    }
+
+    private async Task GuardarMarca()
+    {
+        try
+        {
+            await AuthService.GetToken();
+
+            if (string.IsNullOrWhiteSpace(marcaEdicion.Nombre))
+            {
+                mensaje = "Por favor ingresa el nombre de la marca.";
+                return;
+            }
+
+            HttpResponseMessage response;
+
+            if (marcaEdicion.Id == 0)
+            {
+                response = await Http.PostAsJsonAsync(ApiBaseUrl, marcaEdicion);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"{ApiBaseUrl}/{marcaEdicion.Id}", marcaEdicion);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                mensaje = "¡Marca guardada exitosamente!";
+                mostrarFormulario = false;
+                await CargarMarcasDesdeApi();
+            }
+            else
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                mensaje = $"Error de API ({(int)response.StatusCode}): {errorBody}";
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Excepción al guardar la marca: {ex.Message}";
+        }
+    }
+
+    private void SolicitarConfirmacionEliminar(MarcaDTO marca)
+    {
+        marcaAEliminar = marca;
+        mostrarModalConfirmacion = true;
+    }
+
+    private void CancelarEliminacion()
+    {
+        marcaAEliminar = null;
+        mostrarModalConfirmacion = false;
+    }
+
+    private async Task ConfirmarEliminarMarca()
+    {
+        if (marcaAEliminar == null) return;
+
+        try
+        {
+            await AuthService.GetToken();
+            var response = await Http.DeleteAsync($"{ApiBaseUrl}/{marcaAEliminar.Id}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                mensaje = $"La marca '{marcaAEliminar.Nombre}' fue eliminada con éxito.";
+                marcas.RemoveAll(m => m.Id == marcaAEliminar.Id);
+            }
+            else
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                mensaje = $"Error de API al eliminar ({(int)response.StatusCode}): {errorBody}";
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Error al conectar con la API: {ex.Message}";
+        }
+        finally
+        {
+            mostrarModalConfirmacion = false;
+            marcaAEliminar = null;
+        }
+    }
+
+    public class PageResponseWrapper
+    {
+        [JsonPropertyName("content")]
+        public List<MarcaDTO>? Content { get; set; }
+    }
+}

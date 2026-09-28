@@ -1,0 +1,199 @@
+﻿@page "/catalogo"
+@rendermode InteractiveServer
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@using MarketLocalShirts.Models
+
+<div class="bg-black text-white min-vh-100 py-5 px-3 px-md-5">
+    <!-- Título Principal -->
+    <div class="text-center mb-5">
+        <h1 class="fw-bold display-4 text-white">Catálogo</h1>
+    </div>
+
+    <!-- Barra de Búsqueda y Filtros en Tiempo Real -->
+    <div class="row g-3 mb-5 justify-content-center align-items-center">
+        <!-- Input de Búsqueda -->
+        <div class="col-12 col-md-5">
+            <input type="text" class="form-control bg-secondary bg-opacity-25 text-white border-0 py-2 px-3 rounded-2 placeholder-light" 
+                   placeholder="Buscar playera..." @bind="busqueda" @bind:event="oninput" />
+        </div>
+
+        <!-- Filtro por Marca -->
+        <div class="col-12 col-md-4">
+            <select class="form-select bg-secondary bg-opacity-25 text-white border-0 py-2 px-3 rounded-2" @bind="marcaSeleccionada">
+                <option value="" class="bg-dark text-white">Todas Las Marcas</option>
+                @foreach (var marca in marcas)
+                {
+                    <option value="@marca" class="bg-dark text-white">@marca</option>
+                }
+            </select>
+        </div>
+
+        <!-- Botón para Limpiar Filtros (Solo visible si hay filtros activos) -->
+        @if (!string.IsNullOrEmpty(busqueda) || !string.IsNullOrEmpty(marcaSeleccionada))
+        {
+            <div class="col-12 col-md-2 col-lg-1">
+                <button class="btn btn-outline-secondary w-100 fw-bold text-white py-2 rounded-2 border-0" 
+                        style="background-color: #333;" 
+                        @onclick="LimpiarFiltros" title="Limpiar filtros">
+                    <i class="bi bi-x-circle me-1"></i> Limpiar
+                </button>
+            </div>
+        }
+    </div>
+
+    <!-- Estados de Carga / Error / Lista Vacía -->
+    @if (cargando)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-info" role="status">
+                <span class="visually-hidden">Cargando camisas...</span>
+            </div>
+            <p class="mt-3 text-secondary">Cargando catálogo...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger text-center max-w-500 mx-auto rounded-3">
+            @errorMessage
+        </div>
+    }
+    else if (!CamisasFiltradas.Any())
+    {
+        <div class="text-center py-5 text-secondary">
+            <h5>No se encontraron playeras disponibles.</h5>
+        </div>
+    }
+    else
+    {
+        <!-- Grid de Camisas -->
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4 justify-content-center">
+            @foreach (var camisa in CamisasFiltradas)
+            {
+                <div class="col">
+                    <div class="card h-100 border-0 rounded-4 shadow-sm overflow-hidden" style="background-color: #1a1a1a;">
+                        <!-- Imagen con insignia de Marca -->
+                        <div class="position-relative bg-white text-center p-3 d-flex align-items-center justify-content-center" style="height: 240px;">
+                            <span class="position-absolute top-0 end-0 m-3 badge bg-primary px-3 py-2 rounded-pill fw-bold" style="background-color: #0084ff !important; font-size: 0.75rem;">
+                                @camisa.NombreMarca
+                            </span>
+                            
+                            <img src="@ObtenerImagenValida(camisa)" 
+                                 class="img-fluid" 
+                                 alt="@camisa.Nombre" 
+                                 style="max-height: 200px; object-fit: contain;" />
+                        </div>
+
+                        <!-- Detalles de la Camisa -->
+                        <div class="card-body d-flex flex-column p-3">
+                            <h6 class="fw-bold text-white mb-1">@camisa.Nombre</h6>
+                            <p class="text-secondary small mb-3 flex-grow-1" style="font-size: 0.8rem; line-height: 1.2;">
+                                @camisa.Descripcion
+                            </p>
+
+                            <!-- Precio -->
+                            <div class="mb-3">
+                                <span class="fw-bold fs-5" style="color: #00a8ff;">$@camisa.Precio.ToString("0.00")</span>
+                            </div>
+
+                            <!-- Botón de Acción -->
+                            @if (camisa.Stock > 0 && !camisa.Agotado)
+                            {
+                                <button class="btn w-100 fw-bold rounded-pill border-info text-info py-2 d-flex align-items-center justify-content-center gap-2 btn-anadir" 
+                                        @onclick="() => AgregarAlCarrito(camisa)" 
+                                        style="border: 1.5px solid #00a8ff !important; color: #00a8ff !important; background: transparent;">
+                                    <i class="bi bi-cart-plus"></i> AÑADIR
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-secondary w-100 fw-bold rounded-pill py-2 opacity-50" disabled>
+                                    AGOTADO
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .btn-anadir:hover {
+        background-color: #00a8ff !important;
+        color: #ffffff !important;
+    }
+</style>
+
+@code {
+    private List<CamisaDTO> camisas = new();
+    private List<string> marcas = new();
+    private string busqueda = string.Empty;
+    private string marcaSeleccionada = string.Empty;
+    private bool cargando = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarCamisas();
+    }
+
+    private async Task CargarCamisas()
+    {
+        cargando = true;
+        errorMessage = null;
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<List<CamisaDTO>>("http://localhost:8080/api/camisas/lista");
+            if (response != null)
+            {
+                camisas = response;
+                marcas = camisas.Select(c => c.NombreMarca).Where(m => !string.IsNullOrEmpty(m)).Distinct().ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"No se pudo cargar el catálogo. ({ex.Message})";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private IEnumerable<CamisaDTO> CamisasFiltradas => camisas.Where(c =>
+        (string.IsNullOrEmpty(busqueda) || c.Nombre.Contains(busqueda, StringComparison.OrdinalIgnoreCase) || c.Descripcion.Contains(busqueda, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrEmpty(marcaSeleccionada) || c.NombreMarca.Equals(marcaSeleccionada, StringComparison.OrdinalIgnoreCase))
+    );
+
+    private string ObtenerImagenValida(CamisaDTO camisa)
+    {
+        // Si no tiene URL válida o es de prueba
+        if (string.IsNullOrWhiteSpace(camisa.ImagenUrl) || 
+            !camisa.ImagenUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase) || 
+            camisa.ImagenUrl == "url_imagen_ejemplo")
+        {
+            // Retorna una camisa recortada estilo producto según el color/tipo
+            if (camisa.Nombre.Contains("azul", StringComparison.OrdinalIgnoreCase))
+            {
+                return "https://png.pngtree.com/png-clipart/20230508/original/pngtree-blue-t-shirt-png-image_9153366.png";
+            }
+            return "https://png.pngtree.com/png-clipart/20230508/original/pngtree-black-t-shirt-png-image_9153361.png";
+        }
+
+        return camisa.ImagenUrl;
+    }
+
+    private void LimpiarFiltros()
+    {
+        busqueda = string.Empty;
+        marcaSeleccionada = string.Empty;
+    }
+
+    private void AgregarAlCarrito(CamisaDTO camisa)
+    {
+        // Próximo paso: Agregar al carrito
+    }
+}

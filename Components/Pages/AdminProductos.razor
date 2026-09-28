@@ -1,0 +1,494 @@
+﻿@page "/admin/productos"
+@using MarketLocalShirts.Models
+@using MarketLocalShirts.Service.Auth
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@inject HttpClient Http
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Administración de Productos - MarketLocalShirts</PageTitle>
+
+<div class="container my-5 text-white">
+
+    @if (!mostrarFormulario)
+    {
+        <!-- ========================================== -->
+        <!--   VISTA 1: TABLA / LISTADO DE PRODUCTOS    -->
+        <!-- ========================================== -->
+        <div class="d-flex justify-content-between align-items-center mb-5">
+            <h1 class="fw-bold display-3 m-0">Productos</h1>
+            <button class="btn btn-info text-white fw-bold px-4 py-3 fs-4 rounded-3" 
+                    style="background-color: #00a8ff; border: none; min-width: 160px;" 
+                    @onclick="AbrirFormularioNuevo">
+                + Nuevo
+            </button>
+        </div>
+
+        <!-- Buscador -->
+        <div class="row justify-content-center mb-5">
+            <div class="col-md-8 d-flex gap-2">
+                <input type="text" 
+                       class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                       placeholder="Buscar producto por nombre o marca..." 
+                       @bind="criterioBusqueda" 
+                       @bind:event="oninput" />
+                <button class="btn btn-info text-white fw-bold px-4 fs-5" 
+                        style="background-color: #00a8ff; border: none; min-width: 140px;"
+                        @onclick="FiltrarProductos">
+                    Buscar
+                </button>
+            </div>
+        </div>
+
+        <!-- Encabezados -->
+        <div class="row text-white fw-bold fs-4 mb-3 px-3">
+            <div class="col-md-4">Producto</div>
+            <div class="col-md-2 text-center">Marca</div>
+            <div class="col-md-2 text-center">Precio</div>
+            <div class="col-md-1 text-center">Stock</div>
+            <div class="col-md-3 text-center">Acciones</div>
+        </div>
+
+        <!-- Listado -->
+        @if (cargando)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-info" role="status">
+                    <span class="visually-hidden">Cargando productos desde la API...</span>
+                </div>
+            </div>
+        }
+        else if (productosFiltrados == null || !productosFiltrados.Any())
+        {
+            <div class="text-center py-5 text-white-50 fs-4">
+                No hay productos registrados en la base de datos.
+            </div>
+        }
+        else
+        {
+            @foreach (var prod in productosFiltrados)
+            {
+                <div class="row align-items-center bg-black py-3 mb-3 rounded border border-secondary px-3">
+                    <div class="col-md-4 d-flex align-items-center gap-3">
+                        <img src="@(string.IsNullOrEmpty(prod.ImagenUrl) ? "/camisa-polo.png" : prod.ImagenUrl)" 
+                             alt="@prod.Nombre" 
+                             style="width: 70px; height: 70px; object-fit: contain; background: #fff;" 
+                             class="rounded border" />
+                        <h4 class="fw-bold m-0 fs-4">@prod.Nombre</h4>
+                    </div>
+
+                    <div class="col-md-2 text-center fs-4 fw-bold text-capitalize">
+                        @prod.NombreMarca
+                    </div>
+
+                    <div class="col-md-2 text-center fs-4 fw-bold text-info">
+                        $@prod.Precio.ToString("F2")
+                    </div>
+
+                    <div class="col-md-1 text-center fs-4 fw-bold">
+                        @prod.Stock
+                    </div>
+
+                    <div class="col-md-3 d-flex justify-content-center gap-2">
+                        <button class="btn btn-warning text-dark fw-bold px-3 py-2 fs-5" 
+                                @onclick="() => AbrirFormularioEditar(prod)">
+                            Editar
+                        </button>
+                        <button class="btn btn-danger text-white fw-bold px-3 py-2 fs-5" 
+                                @onclick="() => SolicitarConfirmacionEliminar(prod)">
+                            Eliminar
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+    }
+    else
+    {
+        <!-- ========================================== -->
+        <!--  VISTA 2: FORMULARIO SEGÚN EL PROTOTIPO    -->
+        <!-- ========================================== -->
+        <div class="d-flex justify-content-between align-items-center mb-5">
+            <h1 class="fw-bold display-3 m-0">
+                @(productoEdicion.Id == 0 ? "Nuevo Producto" : "Editar Producto")
+            </h1>
+            <button class="btn btn-info text-white fw-bold px-4 py-3 fs-4 rounded-3" 
+                    style="background-color: #00a8ff; border: none; min-width: 160px;" 
+                    @onclick="CancelarFormulario">
+                Volver
+            </button>
+        </div>
+
+        <div class="row justify-content-center g-5 align-items-start">
+            <!-- Columna Izquierda: Vista Previa de Imagen -->
+            <div class="col-md-5 d-flex flex-column align-items-center">
+                <div class="bg-secondary rounded-3 d-flex align-items-center justify-content-center text-white border border-secondary mb-3 w-100" 
+                     style="height: 380px; overflow: hidden; background-color: #4a4a4a !important;">
+                    @if (!string.IsNullOrEmpty(productoEdicion.ImagenUrl))
+                    {
+                        <img src="@productoEdicion.ImagenUrl" alt="Vista previa" style="max-height: 100%; max-width: 100%; object-fit: contain;" />
+                    }
+                    else
+                    {
+                        <span class="fs-1 fw-bold text-white-50">Imagen</span>
+                    }
+                </div>
+                <div class="w-100">
+                    <label class="form-label fw-bold fs-5">URL / Ruta de la Imagen</label>
+                    <input type="text" 
+                           class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                           @bind="productoEdicion.ImagenUrl" 
+                           @bind:event="oninput"
+                           placeholder="/camisa-polo.png" />
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Campos de Entrada -->
+            <div class="col-md-7">
+                <div class="mb-4">
+                    <label class="form-label fw-bold fs-4">Nombre</label>
+                    <input type="text" 
+                           class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                           @bind="productoEdicion.Nombre" 
+                           placeholder="Nombre del producto" />
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold fs-4">Descripcion</label>
+                    <textarea class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                              rows="3" 
+                              @bind="productoEdicion.Descripcion" 
+                              placeholder="Descripción detallada de la prenda"></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold fs-4">Marca</label>
+                    <input type="text" 
+                           class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                           @bind="nombreMarcaInput" 
+                           placeholder="Marca" />
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold fs-4">Precio</label>
+                        <input type="number" 
+                               step="0.01" 
+                               class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                               @bind="productoEdicion.Precio" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold fs-4">Stock</label>
+                        <input type="number" 
+                               class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                               @bind="productoEdicion.Stock" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botones Inferiores Centrados -->
+        <div class="row mt-5">
+            <div class="col-12 d-flex justify-content-center gap-4">
+                <button class="btn btn-info text-white fw-bold px-5 py-3 fs-3 rounded-2" 
+                        style="background-color: #00a8ff; border: none; min-width: 220px;" 
+                        @onclick="GuardarProducto">
+                    Guardar
+                </button>
+                <button class="btn btn-light text-dark fw-bold px-5 py-3 fs-3 rounded-2" 
+                        style="min-width: 220px;" 
+                        @onclick="CancelarFormulario">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    }
+
+    <!-- Mensaje de Feedback -->
+    @if (!string.IsNullOrEmpty(mensaje))
+    {
+        <div class="row mt-4">
+            <div class="col-12 text-center">
+                <div class="alert alert-info d-inline-block px-4 py-2 fs-5" role="alert">
+                    @mensaje
+                </div>
+            </div>
+        </div>
+    }
+
+</div>
+
+<!-- MODAL DE CONFIRMACIÓN DE ELIMINACIÓN -->
+@if (mostrarModalConfirmacion)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.85);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-white border border-secondary p-3">
+                <div class="modal-header border-0 pb-0">
+                    <h4 class="modal-title fw-bold text-danger">⚠️ Confirmar eliminación</h4>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CancelarEliminacion"></button>
+                </div>
+                <div class="modal-body py-4 fs-4 text-center">
+                    ¿Estás seguro de que deseas eliminar el producto <strong class="text-info">"@productoAEliminar?.Nombre"</strong>?
+                </div>
+                <div class="modal-footer border-0 d-flex justify-content-center gap-3">
+                    <button type="button" class="btn btn-danger fw-bold px-4 py-2 fs-5" @onclick="ConfirmarEliminarProducto">
+                        Sí, eliminar
+                    </button>
+                    <button type="button" class="btn btn-secondary fw-bold px-4 py-2 fs-5" @onclick="CancelarEliminacion">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<CamisaDTO> productos = new();
+    private string criterioBusqueda = string.Empty;
+    private string mensaje = string.Empty;
+    private bool cargando = true;
+    private bool mostrarFormulario = false;
+
+    private bool mostrarModalConfirmacion = false;
+    private CamisaDTO? productoAEliminar = null;
+
+    private CamisaDTO productoEdicion = new();
+    private string nombreMarcaInput = string.Empty;
+
+    private const string ApiBaseUrl = "http://localhost:8080/api/camisas";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarProductosDesdeApi();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var userEmail = await JS.InvokeAsync<string>("localStorage.getItem", "userEmail");
+                var userRole = await JS.InvokeAsync<string>("localStorage.getItem", "userRole");
+
+                bool esAdmin = (!string.IsNullOrEmpty(userRole) && userRole.Equals("ADMIN", StringComparison.OrdinalIgnoreCase))
+                              || (!string.IsNullOrEmpty(userEmail) && userEmail.Equals("Admin@gmail.com", StringComparison.OrdinalIgnoreCase));
+
+                if (!esAdmin)
+                {
+                    Navigation.NavigateTo("/");
+                }
+            }
+            catch
+            {
+                Navigation.NavigateTo("/");
+            }
+        }
+    }
+
+    private async Task<string> ObtenerTokenSesion()
+    {
+        try
+        {
+            var token = await JS.InvokeAsync<string>("localStorage.getItem", "authToken");
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                token = await AuthService.GetToken();
+            }
+            return token ?? string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private async Task CargarProductosDesdeApi()
+    {
+        cargando = true;
+        try
+        {
+            var jsonString = await Http.GetStringAsync($"{ApiBaseUrl}/lista");
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+            if (!string.IsNullOrWhiteSpace(jsonString))
+            {
+                if (jsonString.TrimStart().StartsWith("["))
+                {
+                    var lista = JsonSerializer.Deserialize<List<CamisaDTO>>(jsonString, options);
+                    if (lista != null) productos = lista;
+                }
+                else
+                {
+                    var wrapper = JsonSerializer.Deserialize<PageResponseWrapper>(jsonString, options);
+                    if (wrapper?.Content != null)
+                    {
+                        productos = wrapper.Content;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Nota al sincronizar con API: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private IEnumerable<CamisaDTO> productosFiltrados =>
+        string.IsNullOrWhiteSpace(criterioBusqueda)
+            ? productos
+            : productos.Where(p => p.Nombre.Contains(criterioBusqueda, StringComparison.OrdinalIgnoreCase) ||
+                                  (p.Marca != null && p.Marca.Nombre.Contains(criterioBusqueda, StringComparison.OrdinalIgnoreCase)));
+
+    private void FiltrarProductos() { }
+
+    private void AbrirFormularioNuevo()
+    {
+        productoEdicion = new CamisaDTO 
+        { 
+            Stock = 10, 
+            Precio = 25.00m, 
+            ImagenUrl = "/camisa-polo.png",
+            Marca = new MarcaDTO { Id = 1, Nombre = "Adidas" },
+            Categoria = new CategoriaDTO { Id = 1, Nombre = "Camisetas" }
+        };
+        nombreMarcaInput = "Adidas";
+        mostrarFormulario = true;
+        mensaje = string.Empty;
+    }
+
+    private void AbrirFormularioEditar(CamisaDTO prod)
+    {
+        productoEdicion = new CamisaDTO
+        {
+            Id = prod.Id,
+            Nombre = prod.Nombre,
+            Descripcion = prod.Descripcion,
+            Precio = prod.Precio,
+            Stock = prod.Stock,
+            Agotado = prod.Agotado,
+            ImagenUrl = prod.ImagenUrl,
+            Talla = prod.Talla,
+            Color = prod.Color,
+            Marca = prod.Marca != null ? new MarcaDTO { Id = prod.Marca.Id, Nombre = prod.Marca.Nombre } : new MarcaDTO { Id = 1, Nombre = "MLS" },
+            Categoria = prod.Categoria != null ? new CategoriaDTO { Id = prod.Categoria.Id, Nombre = prod.Categoria.Nombre } : new CategoriaDTO { Id = 1, Nombre = "Camisetas" }
+        };
+        nombreMarcaInput = prod.Marca?.Nombre ?? "Adidas";
+        mostrarFormulario = true;
+        mensaje = string.Empty;
+    }
+
+    private void CancelarFormulario()
+    {
+        mostrarFormulario = false;
+        mensaje = string.Empty;
+    }
+
+    private async Task GuardarProducto()
+    {
+        try
+        {
+            var token = await ObtenerTokenSesion();
+            var payload = new
+            {
+                id = productoEdicion.Id,
+                nombre = string.IsNullOrWhiteSpace(productoEdicion.Nombre) ? "Camisa MLS" : productoEdicion.Nombre,
+                descripcion = string.IsNullOrWhiteSpace(productoEdicion.Descripcion) ? "Sin descripción" : productoEdicion.Descripcion,
+                precio = productoEdicion.Precio,
+                stock = productoEdicion.Stock,
+                agotado = productoEdicion.Stock <= 0,
+                imagenUrl = string.IsNullOrWhiteSpace(productoEdicion.ImagenUrl) ? "/camisa-polo.png" : productoEdicion.ImagenUrl,
+                talla = "M",
+                color = "Negro",
+                marcaId = productoEdicion.Marca?.Id > 0 ? productoEdicion.Marca.Id : 1,
+                categoriaId = productoEdicion.Categoria?.Id > 0 ? productoEdicion.Categoria.Id : 1
+            };
+
+            var url = productoEdicion.Id == 0 ? ApiBaseUrl : $"{ApiBaseUrl}/{productoEdicion.Id}";
+            var method = productoEdicion.Id == 0 ? HttpMethod.Post : HttpMethod.Put;
+
+            using var request = new HttpRequestMessage(method, url);
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+            
+            var jsonBody = JsonSerializer.Serialize(payload);
+            request.Content = new StringContent(jsonBody, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await Http.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                mensaje = "¡Producto guardado exitosamente!";
+                mostrarFormulario = false;
+                await CargarProductosDesdeApi();
+            }
+            else
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                mensaje = $"Error de API ({(int)response.StatusCode}): {errorBody}";
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Error al guardar: {ex.Message}";
+        }
+    }
+
+    private void SolicitarConfirmacionEliminar(CamisaDTO prod)
+    {
+        productoAEliminar = prod;
+        mostrarModalConfirmacion = true;
+    }
+
+    private void CancelarEliminacion()
+    {
+        productoAEliminar = null;
+        mostrarModalConfirmacion = false;
+    }
+
+    private async Task ConfirmarEliminarProducto()
+    {
+        if (productoAEliminar == null) return;
+
+        int idEliminar = productoAEliminar.Id;
+        string nombreProd = productoAEliminar.Nombre;
+
+        try
+        {
+            var token = await ObtenerTokenSesion();
+
+            using var request = new HttpRequestMessage(HttpMethod.Delete, $"{ApiBaseUrl}/{idEliminar}");
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+
+            await Http.SendAsync(request);
+        }
+        catch { }
+
+        // Se elimina de la colección local para asegurar fluidez en la interfaz de Blazor
+        productos.RemoveAll(p => p.Id == idEliminar);
+        mensaje = $"Producto '{nombreProd}' eliminado de la lista.";
+
+        mostrarModalConfirmacion = false;
+        productoAEliminar = null;
+        StateHasChanged();
+    }
+
+    public class PageResponseWrapper
+    {
+        [JsonPropertyName("content")]
+        public List<CamisaDTO>? Content { get; set; }
+    }
+}

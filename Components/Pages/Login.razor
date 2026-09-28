@@ -1,0 +1,115 @@
+﻿@page "/login"
+@rendermode InteractiveServer
+@inject HttpClient Http
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@using MarketLocalShirts.Service.Auth
+@using System.Text.Json.Serialization
+
+<PageTitle>Iniciar Sesión - MarketLocalShirts</PageTitle>
+
+<div class="login-wrapper d-flex align-items-center justify-content-center bg-black text-white px-3 py-5" style="min-height: calc(100vh - 60px);">
+    <div class="card text-white p-4 shadow-lg border-0 rounded-3" style="max-width: 400px; width: 100%; background-color: #2b2b2b !important;">
+        <div class="text-center mb-3">
+            <h2 class="fw-bold fs-4 mb-1">¡Bienvenido!</h2>
+            <p class="fs-6 text-light mb-0">Inicia sesión para continuar.</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger py-2 text-center rounded-3 mb-3 small">@errorMessage</div>
+        }
+
+        <div class="form-group mb-3">
+            <label class="form-label fw-bold mb-1 small">Correo Electrónico</label>
+            <input type="text" class="form-control bg-light text-dark border-0 rounded-2" @bind="loginModel.Login" placeholder="tucorreo@email.com" />
+        </div>
+
+        <div class="form-group mb-4">
+            <label class="form-label fw-bold mb-1 small">Contraseña</label>
+            <input type="password" class="form-control bg-light text-dark border-0 rounded-2" @bind="loginModel.Clave" placeholder="••••••••" />
+        </div>
+
+        <button type="button" class="btn btn-info w-100 fw-bold text-white mb-3 rounded-2" style="background-color: #00a8ff; border: none; padding: 0.6rem;" @onclick="HandleLogin">
+            Iniciar Sesión
+        </button>
+
+        <div class="text-center small">
+            <p class="mb-1 text-light">
+                ¿No tienes una cuenta?
+                <a href="/registro" class="text-decoration-none fw-bold" style="color: #00a8ff;">Registrarse</a>
+            </p>
+            <p class="mb-0">
+                <a href="/recuperar-contrasena" class="text-decoration-none fw-bold" style="color: #00a8ff;">Restablecer Contraseña</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginModel loginModel = new();
+    private string? errorMessage;
+
+    private async Task HandleLogin()
+    {
+        errorMessage = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("http://localhost:8080/api/auth/login", loginModel);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var resultado = await response.Content.ReadFromJsonAsync<TokenResponseDto>();
+                if (resultado != null && !string.IsNullOrEmpty(resultado.Token))
+                {
+                    // 1. Guardar token en el AuthService
+                    await AuthService.SetToken(resultado.Token);
+
+                    // 2. Persistencia en localStorage (Token + Correo + Rol)
+                    await JS.InvokeVoidAsync("localStorage.setItem", "authToken", resultado.Token);
+                    await JS.InvokeVoidAsync("localStorage.setItem", "userEmail", loginModel.Login);
+
+                    bool esAdmin = loginModel.Login.Equals("Admin@gmail.com", StringComparison.OrdinalIgnoreCase);
+
+                    if (esAdmin)
+                    {
+                        await JS.InvokeVoidAsync("localStorage.setItem", "userRole", "ADMIN");
+                        // Redirigir al panel de administración
+                        Navigation.NavigateTo("/admin/usuarios", forceLoad: true);
+                    }
+                    else
+                    {
+                        await JS.InvokeVoidAsync("localStorage.setItem", "userRole", "CLIENTE");
+                        // Redirigir a inicio para clientes normales
+                        Navigation.NavigateTo("/", forceLoad: true);
+                    }
+                }
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Error {(int)response.StatusCode}: {errorContent}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Excepción: {ex.Message}";
+        }
+    }
+
+    public class LoginModel
+    {
+        [JsonPropertyName("login")]
+        public string Login { get; set; } = string.Empty;
+
+        [JsonPropertyName("clave")]
+        public string Clave { get; set; } = string.Empty;
+    }
+
+    public class TokenResponseDto
+    {
+        [JsonPropertyName("token")]
+        public string Token { get; set; } = string.Empty;
+    }
+}
