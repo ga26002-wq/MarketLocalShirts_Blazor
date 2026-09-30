@@ -1,0 +1,261 @@
+﻿@page "/pago"
+@rendermode InteractiveServer
+@inject MarketLocalShirts.Service.Carrito.CarritoService CarritoService
+@inject NavigationManager Navigation
+@using MarketLocalShirts.DTOs
+
+<PageTitle>Pago - MarketLocalShirts</PageTitle>
+
+<div class="bg-black text-white min-vh-100 py-5 px-3 px-md-5">
+    <!-- Título Principal -->
+    <div class="text-center mb-4">
+        <h1 class="fw-bold display-4 text-white">Pago</h1>
+        <h3 class="fw-bold text-info">Total: $@totalGeneral.ToString("F2")</h3>
+    </div>
+
+    <!-- Formulario de Pago Estilo Profesional -->
+    <div class="card bg-dark border border-secondary rounded-4 p-4 p-md-5 mx-auto shadow-lg" style="max-width: 650px;">
+        <div class="mb-3">
+            <label class="form-label text-white fw-bold mb-1">Nombre</label>
+            <input type="text" class="form-control bg-secondary text-white border-0 p-3 rounded-2" autocomplete="off" placeholder="Nombre completo" @bind="nombre" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label text-white fw-bold mb-1">Correo</label>
+            <input type="email" class="form-control bg-secondary text-white border-0 p-3 rounded-2" autocomplete="off" placeholder="correo@ejemplo.com" @bind="correo" />
+        </div>
+
+        <div class="mb-4">
+            <label class="form-label text-white fw-bold mb-1">Direccion</label>
+            <input type="text" class="form-control bg-secondary text-white border-0 p-3 rounded-2" autocomplete="off" placeholder="Dirección de entrega" @bind="direccion" />
+        </div>
+
+        <hr class="border-secondary mb-4" />
+
+        <h4 class="fw-bold text-white mb-3">Tarjeta</h4>
+
+        <div class="mb-3">
+            <label class="form-label text-white fw-bold mb-1">Titular</label>
+            <input type="text" class="form-control bg-secondary text-white border-0 p-3 rounded-2" autocomplete="off" placeholder="Nombre en la tarjeta" @bind="titularTarjeta" />
+        </div>
+
+        <!-- Número de Tarjeta con formato automático de 4 en 4 -->
+        <div class="mb-3">
+            <label class="form-label text-white fw-bold mb-1">Numero</label>
+            <input type="text" class="form-control bg-secondary text-white border-0 p-3 rounded-2" 
+                   maxlength="19" 
+                   autocomplete="off" 
+                   placeholder="4444 4444 4444 4444" 
+                   @bind="numeroTarjeta" 
+                   @bind:event="oninput" />
+        </div>
+
+        <div class="row g-3 mb-5">
+            <div class="col-6">
+                <label class="form-label text-white fw-bold mb-1">Vence</label>
+                <!-- Vencimiento con formato automático MM/AA -->
+                <input type="text" class="form-control bg-secondary text-white border-0 p-3 rounded-2 text-center" 
+                       maxlength="5" 
+                       name="no-vence-field"
+                       autocomplete="off" 
+                       placeholder="MM/AA" 
+                       @bind="vencimiento" 
+                       @bind:event="oninput" />
+            </div>
+            <div class="col-6">
+                <label class="form-label text-white fw-bold mb-1">CVV</label>
+                <!-- CVV limitado estrictamente a 3 dígitos -->
+                <input type="password" class="form-control bg-secondary text-white border-0 p-3 rounded-2 text-center" 
+                       maxlength="3" 
+                       name="no-cvv-field"
+                       autocomplete="new-password" 
+                       placeholder="123" 
+                       @bind="cvv" 
+                       @bind:event="oninput" />
+            </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="d-flex gap-3 justify-content-between">
+            <button class="btn w-50 fw-bold py-3 fs-5 rounded-2 text-dark btn-volver" 
+                    style="background-color: #00a8ff; border: none;"
+                    @onclick="VolverAlCarrito">
+                Volver
+            </button>
+            <button class="btn w-50 fw-bold py-3 fs-5 rounded-2 text-dark btn-pagar" 
+                    style="background-color: #00a8ff; border: none;"
+                    @onclick="ProcesarPagoFinal">
+                Pagar
+            </button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(mensajeError))
+        {
+            <div class="alert alert-danger mt-4 text-center rounded-2">
+                @mensajeError
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .btn-pagar:hover, .btn-volver:hover {
+        background-color: #0084ff !important;
+        color: #fff !important;
+    }
+</style>
+
+@code {
+    private decimal totalGeneral = 0m;
+    private string nombre = string.Empty;
+    private string correo = string.Empty;
+    private string direccion = string.Empty;
+    private string titularTarjeta = string.Empty;
+    
+    // Propiedad para Número de Tarjeta (Espacios automáticos)
+    private string _numeroTarjeta = string.Empty;
+    private string numeroTarjeta
+    {
+        get => _numeroTarjeta;
+        set
+        {
+            if (_numeroTarjeta != value)
+            {
+                var soloNumeros = new string((value ?? "").Where(char.IsDigit).ToArray());
+                if (soloNumeros.Length > 16) soloNumeros = soloNumeros.Substring(0, 16);
+
+                var bloques = Enumerable.Range(0, (soloNumeros.Length + 3) / 4)
+                    .Select(i => soloNumeros.Substring(i * 4, Math.Min(4, soloNumeros.Length - i * 4)));
+                
+                _numeroTarjeta = string.Join(" ", bloques);
+            }
+        }
+    }
+
+    // Propiedad para Vencimiento (Formato automático MM/AA)
+    private string _vencimiento = string.Empty;
+    private string vencimiento
+    {
+        get => _vencimiento;
+        set
+        {
+            if (_vencimiento != value)
+            {
+                var soloNumeros = new string((value ?? "").Where(char.IsDigit).ToArray());
+                if (soloNumeros.Length > 4) soloNumeros = soloNumeros.Substring(0, 4);
+
+                if (soloNumeros.Length >= 3)
+                {
+                    _vencimiento = soloNumeros.Substring(0, 2) + "/" + soloNumeros.Substring(2);
+                }
+                else
+                {
+                    _vencimiento = soloNumeros;
+                }
+            }
+        }
+    }
+
+    // Propiedad para CVV (Máximo 3 dígitos)
+    private string _cvv = string.Empty;
+    private string cvv
+    {
+        get => _cvv;
+        set
+        {
+            if (_cvv != value)
+            {
+                var soloNumeros = new string((value ?? "").Where(char.IsDigit).ToArray());
+                if (soloNumeros.Length > 3) soloNumeros = soloNumeros.Substring(0, 3);
+                _cvv = soloNumeros;
+            }
+        }
+    }
+
+    private string mensajeError = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var items = await CarritoService.ObtenerCarritoAsync();
+        if (items != null)
+        {
+            totalGeneral = items.Sum(x => x.SubTotal);
+        }
+    }
+
+    private void VolverAlCarrito()
+    {
+        Navigation.NavigateTo("/carrito");
+    }
+
+    private async Task ProcesarPagoFinal()
+    {
+        mensajeError = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(nombre) || string.IsNullOrWhiteSpace(correo) || 
+            string.IsNullOrWhiteSpace(direccion) || string.IsNullOrWhiteSpace(numeroTarjeta) || 
+            string.IsNullOrWhiteSpace(vencimiento) || string.IsNullOrWhiteSpace(cvv))
+        {
+            mensajeError = "Por favor completa todos los campos obligatorios para procesar tu pago.";
+            return;
+        }
+
+        // Validar CVV exacto de 3 dígitos
+        if (cvv.Length < 3)
+        {
+            mensajeError = "El CVV debe tener exactamente 3 dígitos.";
+            return;
+        }
+
+        // Validar que la tarjeta no esté vencida
+        if (vencimiento.Length == 5 && vencimiento.Contains('/'))
+        {
+            var partes = vencimiento.Split('/');
+            if (int.TryParse(partes[0], out int mes) && int.TryParse(partes[1], out int anioCorto))
+            {
+                if (mes < 1 || mes > 12)
+                {
+                    mensajeError = "El mes de vencimiento no es válido (debe ser 01 al 12).";
+                    return;
+                }
+
+                int anio = 2000 + anioCorto;
+                var fechaActual = DateTime.Now;
+                var fechaVencimiento = new DateTime(anio, mes, DateTime.DaysInMonth(anio, mes));
+
+                if (fechaVencimiento < fechaActual)
+                {
+                    mensajeError = "La tarjeta ingresada está vencida. Por favor usa una vigentes.";
+                    return;
+                }
+            }
+            else
+            {
+                mensajeError = "El formato de vencimiento es inválido (usa MM/AA).";
+                return;
+            }
+        }
+        else
+        {
+            mensajeError = "Debes ingresar una fecha de vencimiento completa (MM/AA).";
+            return;
+        }
+
+        try
+        {
+            bool exito = await CarritoService.ProcesarPagoAsync();
+            if (exito)
+            {
+                Navigation.NavigateTo("/mis-pedidos");
+            }
+            else
+            {
+                mensajeError = "La pasarela de pago rechazó la transacción. Verifica tus datos.";
+            }
+        }
+        catch (Exception ex)
+        {
+            mensajeError = $"Error en el servidor al procesar el pago: {ex.Message}";
+        }
+    }
+}

@@ -15,7 +15,7 @@
     @if (!mostrarFormulario)
     {
         <!-- ========================================== -->
-        <!--   VISTA 1: TABLA / LISTADO DE PRODUCTOS    -->
+        <!--    VISTA 1: TABLA / LISTADO DE PRODUCTOS    -->
         <!-- ========================================== -->
         <div class="d-flex justify-content-between align-items-center mb-5">
             <h1 class="fw-bold display-3 m-0">Productos</h1>
@@ -163,12 +163,22 @@
                               placeholder="Descripción detallada de la prenda"></textarea>
                 </div>
 
+                <!-- DESPLEGABLE DINÁMICO DE MARCAS DESDE LA API -->
                 <div class="mb-4">
                     <label class="form-label fw-bold fs-4">Marca</label>
-                    <input type="text" 
-                           class="form-control bg-secondary text-white border-0 fs-5 p-3" 
-                           @bind="nombreMarcaInput" 
-                           placeholder="Marca" />
+                    <select class="form-select bg-secondary text-white border-0 fs-5 p-3" @bind="idMarcaSeleccionada">
+                        @if (listaMarcas == null || !listaMarcas.Any())
+                        {
+                            <option value="0">-- Cargando marcas... --</option>
+                        }
+                        else
+                        {
+                            @foreach (var m in listaMarcas)
+                            {
+                                <option value="@m.Id">@m.Nombre</option>
+                            }
+                        }
+                    </select>
                 </div>
 
                 <div class="row mb-4">
@@ -248,6 +258,9 @@
 
 @code {
     private List<CamisaDTO> productos = new();
+    private List<MarcaDTO> listaMarcas = new();
+    private int idMarcaSeleccionada = 1;
+
     private string criterioBusqueda = string.Empty;
     private string mensaje = string.Empty;
     private bool cargando = true;
@@ -260,10 +273,12 @@
     private string nombreMarcaInput = string.Empty;
 
     private const string ApiBaseUrl = "http://localhost:8080/api/camisas";
+    private const string ApiMarcasUrl = "http://localhost:8080/api/marcas";
 
     protected override async Task OnInitializedAsync()
     {
         await CargarProductosDesdeApi();
+        await CargarMarcasDesdeApi();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -272,22 +287,52 @@
         {
             try
             {
-                var userEmail = await JS.InvokeAsync<string>("localStorage.getItem", "userEmail");
-                var userRole = await JS.InvokeAsync<string>("localStorage.getItem", "userRole");
-
-                bool esAdmin = (!string.IsNullOrEmpty(userRole) && userRole.Equals("ADMIN", StringComparison.OrdinalIgnoreCase))
-                              || (!string.IsNullOrEmpty(userEmail) && userEmail.Equals("Admin@gmail.com", StringComparison.OrdinalIgnoreCase));
-
-                if (!esAdmin)
+                var token = await JS.InvokeAsync<string>("localStorage.getItem", "authToken");
+                if (string.IsNullOrWhiteSpace(token))
                 {
-                    Navigation.NavigateTo("/");
+                    token = await JS.InvokeAsync<string>("localStorage.getItem", "token");
+                }
+
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    Navigation.NavigateTo("/login");
                 }
             }
             catch
             {
-                Navigation.NavigateTo("/");
+                Navigation.NavigateTo("/login");
             }
         }
+    }
+
+    private async Task CargarMarcasDesdeApi()
+    {
+        try
+        {
+            var jsonString = await Http.GetStringAsync(ApiMarcasUrl);
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+            if (!string.IsNullOrWhiteSpace(jsonString))
+            {
+                if (jsonString.TrimStart().StartsWith("["))
+                {
+                    var lista = JsonSerializer.Deserialize<List<MarcaDTO>>(jsonString, options);
+                    if (lista != null && lista.Any())
+                    {
+                        listaMarcas = lista;
+                    }
+                }
+                else
+                {
+                    var wrapper = JsonSerializer.Deserialize<PageResponseWrapperMarcas>(jsonString, options);
+                    if (wrapper?.Content != null && wrapper.Content.Any())
+                    {
+                        listaMarcas = wrapper.Content;
+                    }
+                }
+            }
+        }
+        catch { }
     }
 
     private async Task<string> ObtenerTokenSesion()
@@ -350,23 +395,35 @@
 
     private void FiltrarProductos() { }
 
-    private void AbrirFormularioNuevo()
+    private async Task AbrirFormularioNuevo()
     {
+        if (!listaMarcas.Any())
+        {
+            await CargarMarcasDesdeApi();
+        }
+
+        idMarcaSeleccionada = listaMarcas.FirstOrDefault()?.Id ?? 1;
+
         productoEdicion = new CamisaDTO 
         { 
             Stock = 10, 
             Precio = 25.00m, 
             ImagenUrl = "/camisa-polo.png",
-            Marca = new MarcaDTO { Id = 1, Nombre = "Adidas" },
+            Marca = new MarcaDTO { Id = idMarcaSeleccionada, Nombre = listaMarcas.FirstOrDefault()?.Nombre ?? "Adidas" },
             Categoria = new CategoriaDTO { Id = 1, Nombre = "Camisetas" }
         };
-        nombreMarcaInput = "Adidas";
+        nombreMarcaInput = listaMarcas.FirstOrDefault()?.Nombre ?? "Adidas";
         mostrarFormulario = true;
         mensaje = string.Empty;
     }
 
-    private void AbrirFormularioEditar(CamisaDTO prod)
+    private async Task AbrirFormularioEditar(CamisaDTO prod)
     {
+        if (!listaMarcas.Any())
+        {
+            await CargarMarcasDesdeApi();
+        }
+
         productoEdicion = new CamisaDTO
         {
             Id = prod.Id,
@@ -381,6 +438,8 @@
             Marca = prod.Marca != null ? new MarcaDTO { Id = prod.Marca.Id, Nombre = prod.Marca.Nombre } : new MarcaDTO { Id = 1, Nombre = "MLS" },
             Categoria = prod.Categoria != null ? new CategoriaDTO { Id = prod.Categoria.Id, Nombre = prod.Categoria.Nombre } : new CategoriaDTO { Id = 1, Nombre = "Camisetas" }
         };
+
+        idMarcaSeleccionada = prod.Marca?.Id ?? 1;
         nombreMarcaInput = prod.Marca?.Nombre ?? "Adidas";
         mostrarFormulario = true;
         mensaje = string.Empty;
@@ -408,7 +467,7 @@
                 imagenUrl = string.IsNullOrWhiteSpace(productoEdicion.ImagenUrl) ? "/camisa-polo.png" : productoEdicion.ImagenUrl,
                 talla = "M",
                 color = "Negro",
-                marcaId = productoEdicion.Marca?.Id > 0 ? productoEdicion.Marca.Id : 1,
+                marcaId = idMarcaSeleccionada > 0 ? idMarcaSeleccionada : (productoEdicion.Marca?.Id > 0 ? productoEdicion.Marca.Id : 1),
                 categoriaId = productoEdicion.Categoria?.Id > 0 ? productoEdicion.Categoria.Id : 1
             };
 
@@ -477,7 +536,6 @@
         }
         catch { }
 
-        // Se elimina de la colección local para asegurar fluidez en la interfaz de Blazor
         productos.RemoveAll(p => p.Id == idEliminar);
         mensaje = $"Producto '{nombreProd}' eliminado de la lista.";
 
@@ -490,5 +548,11 @@
     {
         [JsonPropertyName("content")]
         public List<CamisaDTO>? Content { get; set; }
+    }
+
+    public class PageResponseWrapperMarcas
+    {
+        [JsonPropertyName("content")]
+        public List<MarcaDTO>? Content { get; set; }
     }
 }

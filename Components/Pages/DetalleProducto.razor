@@ -1,0 +1,165 @@
+﻿@page "/producto/{Id:int}"
+@rendermode InteractiveServer
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject MarketLocalShirts.Service.Carrito.CarritoService CarritoService
+@using MarketLocalShirts.Models
+@using System.Text.Json
+
+<PageTitle>Detalle de Producto - MarketLocalShirts</PageTitle>
+
+<div class="bg-black text-white min-vh-100 py-5 px-3 px-md-5">
+    @if (cargando)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-info" role="status">
+                <span class="visually-hidden">Cargando detalles...</span>
+            </div>
+        </div>
+    }
+    else if (producto == null)
+    {
+        <div class="text-center py-5">
+            <h3 class="fw-bold text-danger">El producto no fue encontrado.</h3>
+            <button class="btn btn-outline-light mt-3 px-4 py-2" @onclick="VolverAlCatalogo">Volver al catálogo</button>
+        </div>
+    }
+    else
+    {
+        <!-- Botón para regresar al catálogo -->
+        <div class="mb-4">
+            <button class="btn btn-outline-secondary text-white fw-bold px-4 py-2 rounded-2 border-0" 
+                    style="background-color: #222;" 
+                    @onclick="VolverAlCatalogo">
+                <i class="bi bi-arrow-left"></i> ← Volver al Catálogo
+            </button>
+        </div>
+
+        <div class="row g-5 align-items-center bg-dark p-4 p-md-5 rounded-4 border border-secondary shadow-lg">
+            <!-- Columna Izquierda: Imagen del Producto -->
+            <div class="col-lg-6">
+                <div class="bg-white p-4 rounded-4 d-flex align-items-center justify-content-center position-relative" style="min-height: 450px;">
+                    <span class="position-absolute top-0 end-0 m-3 badge px-3 py-2 rounded-pill fw-bold fs-6" 
+                          style="background-color: #0084ff !important; color: white;">
+                        @(string.IsNullOrEmpty(producto.NombreMarca) ? "MLS" : producto.NombreMarca)
+                    </span>
+                    <img src="@ObtenerImagenValida(producto)" alt="@producto.Nombre" class="img-fluid" style="max-height: 400px; object-fit: contain;" />
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Información y Compra -->
+            <div class="col-lg-6 ps-lg-4">
+                <div class="text-info text-uppercase fw-bold small mb-2" style="letter-spacing: 2px;">
+                    @(string.IsNullOrEmpty(producto.NombreMarca) ? "CLASICO" : producto.NombreMarca)
+                </div>
+
+                <h1 class="fw-bold display-5 mb-3 text-white">@producto.Nombre</h1>
+                
+                <div class="fs-2 fw-bold mb-4" style="color: #00a8ff;">$@producto.Precio.ToString("0.00")</div>
+
+                <p class="text-secondary fs-5 mb-4 pb-3 border-bottom border-secondary">
+                    @producto.Descripcion
+                </p>
+
+                <div class="mb-4 text-white-50 fw-semibold fs-5">
+                    <span>📦 <strong class="text-white">@producto.Stock</strong> disponibles</span>
+                </div>
+
+                <!-- Selector de Cantidad -->
+                <div class="mb-4" style="max-width: 250px;">
+                    <label class="form-label text-uppercase small fw-bold mb-2 text-white-50" style="letter-spacing: 1px;">Cantidad</label>
+                    <input type="number" class="form-control bg-secondary text-white border-0 fs-5 p-3 text-center rounded-3" 
+                           @bind="cantidad" min="1" max="@(producto.Stock > 0 ? producto.Stock : 1)" />
+                </div>
+
+                <!-- Botón Agregar al Carrito -->
+                <button class="btn w-100 fw-bold py-3 fs-5 rounded-pill shadow-sm text-white btn-agregar-bolsa" 
+                        style="background-color: #00a8ff; border: none;"
+                        @onclick="AgregarAlCarrito">
+                    🛒 AGREGAR AL CARRITO
+                </button>
+
+                @if (!string.IsNullOrEmpty(mensajeFeedback))
+                {
+                    <div class="alert alert-info mt-3 rounded-3 text-center py-2 fs-5">
+                        @mensajeFeedback
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .btn-agregar-bolsa:hover {
+        background-color: #0084ff !important;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private CamisaDTO? producto;
+    private bool cargando = true;
+    private int cantidad = 1;
+    private string mensajeFeedback = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDetalleProducto();
+    }
+
+    private async Task CargarDetalleProducto()
+    {
+        cargando = true;
+        try
+        {
+            producto = await Http.GetFromJsonAsync<CamisaDTO>($"http://localhost:8080/api/camisas/{Id}");
+        }
+        catch
+        {
+            producto = null;
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private string ObtenerImagenValida(CamisaDTO camisa)
+    {
+        if (string.IsNullOrWhiteSpace(camisa.ImagenUrl) || 
+            !camisa.ImagenUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase) || 
+            camisa.ImagenUrl == "url_imagen_ejemplo")
+        {
+            if (camisa.Nombre.Contains("azul", StringComparison.OrdinalIgnoreCase))
+            {
+                return "https://png.pngtree.com/png-clipart/20230508/original/pngtree-blue-t-shirt-png-image_9153366.png";
+            }
+            return "https://png.pngtree.com/png-clipart/20230508/original/pngtree-black-t-shirt-png-image_9153361.png";
+        }
+        return camisa.ImagenUrl;
+    }
+
+    private async Task AgregarAlCarrito()
+    {
+        if (producto == null) return;
+
+        try
+        {
+            await CarritoService.AgregarAlCarritoAsync(producto.Id, cantidad, producto.Nombre, producto.Precio);
+            Navigation.NavigateTo("/carrito");
+        }
+        catch (Exception ex)
+        {
+            mensajeFeedback = $"Error al agregar: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private void VolverAlCatalogo()
+    {
+        Navigation.NavigateTo("/catalogo");
+    }
+}

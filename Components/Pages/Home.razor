@@ -1,4 +1,7 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <div class="container-fluid bg-black text-white min-vh-100 d-flex align-items-center justify-content-center px-5 py-4">
     <div class="row w-100 align-items-center justify-content-between my-auto">
@@ -20,3 +23,72 @@
         </div>
     </div>
 </div>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var token = await JS.InvokeAsync<string>("localStorage.getItem", "authToken");
+                if (string.IsNullOrEmpty(token))
+                {
+                    token = await JS.InvokeAsync<string>("localStorage.getItem", "token");
+                }
+
+                if (!string.IsNullOrEmpty(token))
+                {
+                    var userRole = await JS.InvokeAsync<string>("localStorage.getItem", "userRole");
+                    var userEmail = await JS.InvokeAsync<string>("localStorage.getItem", "userEmail");
+
+                    string cleanRole = (userRole ?? "").Trim().Trim('"').ToUpper();
+                    string cleanEmail = (userEmail ?? "").Trim().Trim('"');
+
+                    bool esAdmin = cleanRole == "ADMIN" || cleanRole == "ROLE_ADMIN" || cleanRole == "1" ||
+                                   cleanEmail.Equals("Admin@gmail.com", StringComparison.OrdinalIgnoreCase);
+
+                    if (!esAdmin)
+                    {
+                        esAdmin = EsAdminToken(token);
+                    }
+
+                    if (esAdmin)
+                    {
+                        await JS.InvokeVoidAsync("localStorage.setItem", "userRole", "ADMIN");
+                        Navigation.NavigateTo("/admin/usuarios");
+                    }
+                }
+            }
+            catch { }
+        }
+    }
+
+    private static bool EsAdminToken(string token)
+    {
+        try
+        {
+            var parts = token.Split('.');
+            if (parts.Length >= 2)
+            {
+                string payloadBase64 = parts[1];
+                payloadBase64 = payloadBase64.Replace('-', '+').Replace('_', '/');
+                switch (payloadBase64.Length % 4)
+                {
+                    case 2: payloadBase64 += "=="; break;
+                    case 3: payloadBase64 += "="; break;
+                }
+                byte[] bytes = Convert.FromBase64String(payloadBase64);
+                string jsonPayload = System.Text.Encoding.UTF8.GetString(bytes).ToUpper();
+
+                return jsonPayload.Contains("ADMIN") || 
+                       jsonPayload.Contains("ROLE_ADMIN") || 
+                       jsonPayload.Contains("\"IDROL\":1") || 
+                       jsonPayload.Contains("\"ROL\":1") ||
+                       jsonPayload.Contains("\"ID_ROL\":1");
+            }
+        }
+        catch { }
+        return false;
+    }
+}

@@ -15,7 +15,7 @@
     @if (!mostrarFormulario)
     {
         <!-- ========================================== -->
-        <!--   VISTA 1: TABLA / LISTADO DE MARCAS      -->
+        <!--    VISTA 1: TABLA / LISTADO DE MARCAS      -->
         <!-- ========================================== -->
         <div class="d-flex justify-content-between align-items-center mb-5">
             <h1 class="fw-bold display-3 m-0">Marcas</h1>
@@ -172,7 +172,6 @@
     private bool cargando = true;
     private bool mostrarFormulario = false;
 
-    // Control para el Modal de Confirmación
     private bool mostrarModalConfirmacion = false;
     private MarcaDTO? marcaAEliminar = null;
 
@@ -190,20 +189,20 @@
         {
             try
             {
-                var userEmail = await JS.InvokeAsync<string>("localStorage.getItem", "userEmail");
-                var userRole = await JS.InvokeAsync<string>("localStorage.getItem", "userRole");
-
-                bool esAdmin = (!string.IsNullOrEmpty(userRole) && userRole.Equals("ADMIN", StringComparison.OrdinalIgnoreCase))
-                              || (!string.IsNullOrEmpty(userEmail) && userEmail.Equals("Admin@gmail.com", StringComparison.OrdinalIgnoreCase));
-
-                if (!esAdmin)
+                var token = await JS.InvokeAsync<string>("localStorage.getItem", "authToken");
+                if (string.IsNullOrWhiteSpace(token))
                 {
-                    Navigation.NavigateTo("/");
+                    token = await JS.InvokeAsync<string>("localStorage.getItem", "token");
+                }
+
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    Navigation.NavigateTo("/login");
                 }
             }
             catch
             {
-                Navigation.NavigateTo("/");
+                Navigation.NavigateTo("/login");
             }
         }
     }
@@ -336,17 +335,18 @@
             else
             {
                 var errorBody = await response.Content.ReadAsStringAsync();
-                mensaje = $"Error de API al eliminar ({(int)response.StatusCode}): {errorBody}";
+                mensaje = $"Error de API ({(int)response.StatusCode}): {errorBody}";
             }
         }
         catch (Exception ex)
         {
-            mensaje = $"Error al conectar con la API: {ex.Message}";
+            mensaje = $"Excepción al eliminar la marca: {ex.Message}";
         }
         finally
         {
             mostrarModalConfirmacion = false;
             marcaAEliminar = null;
+            StateHasChanged();
         }
     }
 

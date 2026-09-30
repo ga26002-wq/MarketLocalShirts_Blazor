@@ -1,0 +1,380 @@
+﻿@page "/admin/pedidos"
+@rendermode InteractiveServer
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@using MarketLocalShirts.Service.Auth
+@inject HttpClient Http
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Administración de Pedidos - MarketLocalShirts</PageTitle>
+
+<div class="container my-5 text-white">
+    <!-- Título Principal Centrado -->
+    <h1 class="text-center mb-5 fw-bold display-3">Pedidos</h1>
+
+    <!-- Buscador de Pedidos -->
+    <div class="row justify-content-center mb-5">
+        <div class="col-md-8 d-flex gap-2">
+            <input type="text" 
+                   class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                   placeholder="Buscar por cliente, correo o # pedido..." 
+                   @bind="criterioBusqueda" 
+                   @bind:event="oninput" />
+            <button class="btn btn-info text-white fw-bold px-4 fs-5" 
+                    style="background-color: #00a8ff; border: none; min-width: 140px;"
+                    @onclick="FiltrarPedidos">
+                Buscar
+            </button>
+        </div>
+    </div>
+
+    <!-- Encabezados de la Tabla (12 columnas organizadas) -->
+    <div class="row text-white fw-bold fs-4 mb-3 px-3">
+        <div class="col-md-1">Pedido</div>
+        <div class="col-md-4">Cliente</div>
+        <div class="col-md-3">Fecha</div>
+        <div class="col-md-2">Estado</div>
+        <div class="col-md-2 text-end pe-3">Acciones</div>
+    </div>
+
+    <!-- Listado de Pedidos -->
+    @if (cargando)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-info" role="status">
+                <span class="visually-hidden">Cargando pedidos...</span>
+            </div>
+        </div>
+    }
+    else if (pedidosFiltrados == null || !pedidosFiltrados.Any())
+    {
+        <div class="text-center py-5 text-white-50 fs-4 bg-black rounded border border-secondary">
+            No se encontraron pedidos registrados.
+        </div>
+    }
+    else
+    {
+        @foreach (var ped in pedidosFiltrados)
+        {
+            <div class="row align-items-center bg-black py-3 mb-3 rounded border border-secondary px-3">
+                <!-- Columna 1: # ID del Pedido -->
+                <div class="col-md-1 fs-3 fw-bold">
+                    #@ped.Id
+                </div>
+
+                <!-- Columna 2: Nombre y Correo del Cliente -->
+                <div class="col-md-4">
+                    <h4 class="fw-bold m-0 fs-4">@ObtenerNombreCliente(ped)</h4>
+                    <p class="text-white-50 m-0 fs-5">@ObtenerEmailCliente(ped)</p>
+                </div>
+
+                <!-- Columna 3: Fecha del Pedido -->
+                <div class="col-md-3 fs-5 fw-semibold">
+                    <div>@ped.FechaFormatted</div>
+                </div>
+
+                <!-- Columna 4: Estado -->
+                <div class="col-md-2 fs-4 fw-bold text-uppercase">
+                    @ped.Estado
+                </div>
+
+                <!-- Columna 5: Botón Editar Estado perfectamente alineado -->
+                <div class="col-md-2 text-end">
+                    <button class="btn btn-info text-dark fw-bold px-3 py-2 fs-5" 
+                            style="background-color: #00a8ff; border: none; color: #000 !important;"
+                            @onclick="() => AbrirModalEditarEstado(ped)">
+                        Editar Estado
+                    </button>
+                </div>
+            </div>
+        }
+    }
+
+    <!-- Alertas de Mensaje -->
+    @if (!string.IsNullOrEmpty(mensaje))
+    {
+        <div class="row mt-4">
+            <div class="col-12 text-center">
+                <div class="alert alert-info d-inline-block px-4 py-2 fs-5" role="alert">
+                    @mensaje
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- MODAL PARA CAMBIAR EL ESTADO DEL PEDIDO -->
+@if (mostrarModalEstado && pedidoSeleccionado != null)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.85);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-white border border-secondary p-4">
+                <div class="modal-header border-0 pb-0">
+                    <h4 class="modal-title fw-bold text-info">Actualizar Estado del Pedido #@pedidoSeleccionado.Id</h4>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CerrarModal"></button>
+                </div>
+                <div class="modal-body py-4">
+                    <label class="form-label fw-bold fs-5 mb-2">Selecciona el nuevo estado:</label>
+                    <select class="form-select bg-secondary text-white border-0 fs-5 p-3" @bind="nuevoEstadoSeleccionado">
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="Procesando">Procesando</option>
+                        <option value="Enviado">Enviado</option>
+                        <option value="Entregado">Entregado</option>
+                        <option value="Cancelado">Cancelado</option>
+                    </select>
+                </div>
+                <div class="modal-footer border-0 d-flex justify-content-center gap-3">
+                    <button type="button" class="btn btn-info fw-bold px-4 py-2 fs-5 text-white" 
+                            style="background-color: #00a8ff; border: none;"
+                            @onclick="GuardarEstadoPedido">
+                        Guardar Cambios
+                    </button>
+                    <button type="button" class="btn btn-secondary fw-bold px-4 py-2 fs-5" @onclick="CerrarModal">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<PedidoAdminDTO> pedidos = new();
+    private string criterioBusqueda = string.Empty;
+    private string mensaje = string.Empty;
+    private bool cargando = true;
+
+    // Control del Modal
+    private bool mostrarModalEstado = false;
+    private PedidoAdminDTO? pedidoSeleccionado = null;
+    private string nuevoEstadoSeleccionado = "Pendiente";
+
+    private const string ApiBaseUrl = "http://localhost:8080/api/pedidos";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarPedidosDesdeApi();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var token = await JS.InvokeAsync<string>("localStorage.getItem", "authToken");
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    token = await JS.InvokeAsync<string>("localStorage.getItem", "token");
+                }
+
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    Navigation.NavigateTo("/login");
+                }
+            }
+            catch
+            {
+                Navigation.NavigateTo("/login");
+            }
+        }
+    }
+
+    private async Task<string> ObtenerTokenLimpio()
+    {
+        try
+        {
+            var token = await JS.InvokeAsync<string>("localStorage.getItem", "authToken");
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                token = await JS.InvokeAsync<string>("localStorage.getItem", "token");
+            }
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                token = token.Trim('"').Trim();
+                if (token.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                {
+                    token = token.Substring(7).Trim();
+                }
+            }
+            return token ?? string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private async Task CargarPedidosDesdeApi()
+    {
+        cargando = true;
+        try
+        {
+            var token = await ObtenerTokenLimpio();
+            using var request = new HttpRequestMessage(HttpMethod.Get, ApiBaseUrl);
+            if (!string.IsNullOrEmpty(token))
+            {
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonString = await response.Content.ReadAsStringAsync();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+                if (!string.IsNullOrWhiteSpace(jsonString))
+                {
+                    if (jsonString.TrimStart().StartsWith("["))
+                    {
+                        var lista = JsonSerializer.Deserialize<List<PedidoAdminDTO>>(jsonString, options);
+                        if (lista != null) pedidos = lista;
+                    }
+                    else
+                    {
+                        var wrapper = JsonSerializer.Deserialize<PageResponseWrapper>(jsonString, options);
+                        if (wrapper?.Content != null) pedidos = wrapper.Content;
+                    }
+                }
+            }
+            else
+            {
+                pedidos = new List<PedidoAdminDTO>();
+            }
+        }
+        catch
+        {
+            pedidos = new List<PedidoAdminDTO>();
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private IEnumerable<PedidoAdminDTO> pedidosFiltrados =>
+        string.IsNullOrWhiteSpace(criterioBusqueda)
+            ? pedidos
+            : pedidos.Where(p => p.Id.ToString().Contains(criterioBusqueda, StringComparison.OrdinalIgnoreCase) ||
+                                  ObtenerNombreCliente(p).Contains(criterioBusqueda, StringComparison.OrdinalIgnoreCase) ||
+                                  ObtenerEmailCliente(p).Contains(criterioBusqueda, StringComparison.OrdinalIgnoreCase) ||
+                                  p.Estado.Contains(criterioBusqueda, StringComparison.OrdinalIgnoreCase));
+
+    private void FiltrarPedidos() { }
+
+    private string ObtenerNombreCliente(PedidoAdminDTO ped)
+    {
+        if (!string.IsNullOrWhiteSpace(ped.ClienteNombre)) return ped.ClienteNombre;
+        if (ped.Usuario != null && !string.IsNullOrWhiteSpace(ped.Usuario.Nombre)) return ped.Usuario.Nombre;
+        return "Cliente MLS";
+    }
+
+    private string ObtenerEmailCliente(PedidoAdminDTO ped)
+    {
+        if (!string.IsNullOrWhiteSpace(ped.ClienteEmail)) return ped.ClienteEmail;
+        if (ped.Usuario != null)
+        {
+            if (!string.IsNullOrWhiteSpace(ped.Usuario.Correo)) return ped.Usuario.Correo;
+            if (!string.IsNullOrWhiteSpace(ped.Usuario.Email)) return ped.Usuario.Email;
+        }
+        return "cliente@gmail.com";
+    }
+
+    private void AbrirModalEditarEstado(PedidoAdminDTO ped)
+    {
+        pedidoSeleccionado = ped;
+        nuevoEstadoSeleccionado = ped.Estado;
+        mostrarModalEstado = true;
+        mensaje = string.Empty;
+    }
+
+    private void CerrarModal()
+    {
+        mostrarModalEstado = false;
+        pedidoSeleccionado = null;
+    }
+
+    private async Task GuardarEstadoPedido()
+    {
+        if (pedidoSeleccionado == null) return;
+
+        try
+        {
+            var token = await ObtenerTokenLimpio();
+            using var request = new HttpRequestMessage(HttpMethod.Put, $"{ApiBaseUrl}/{pedidoSeleccionado.Id}/estado");
+            if (!string.IsNullOrEmpty(token))
+            {
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var payload = new { estado = nuevoEstadoSeleccionado };
+            request.Content = new StringContent(JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json");
+
+            var response = await Http.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                pedidoSeleccionado.Estado = nuevoEstadoSeleccionado;
+                mensaje = $"¡Estado del Pedido #{pedidoSeleccionado.Id} actualizado a '{nuevoEstadoSeleccionado}' en SQL Server!";
+            }
+            else
+            {
+                pedidoSeleccionado.Estado = nuevoEstadoSeleccionado;
+                mensaje = $"Estado cambiado localmente a '{nuevoEstadoSeleccionado}'.";
+            }
+
+            CerrarModal();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Error de conexión: {ex.Message}";
+            CerrarModal();
+            StateHasChanged();
+        }
+    }
+
+    public class PedidoAdminDTO
+    {
+        [JsonPropertyName("id")]
+        public int Id { get; set; }
+
+        [JsonPropertyName("clienteNombre")]
+        public string ClienteNombre { get; set; } = string.Empty;
+
+        [JsonPropertyName("clienteEmail")]
+        public string ClienteEmail { get; set; } = string.Empty;
+
+        [JsonPropertyName("fecha")]
+        public DateTime Fecha { get; set; } = DateTime.Now;
+
+        [JsonPropertyName("estado")]
+        public string Estado { get; set; } = "Pendiente";
+
+        [JsonPropertyName("usuario")]
+        public UsuarioInfoDTO? Usuario { get; set; }
+
+        public string FechaFormatted => Fecha.ToString("dd/MM/yyyy HH:mm");
+    }
+
+    public class UsuarioInfoDTO
+    {
+        [JsonPropertyName("nombre")]
+        public string Nombre { get; set; } = string.Empty;
+
+        [JsonPropertyName("correo")]
+        public string Correo { get; set; } = string.Empty;
+
+        [JsonPropertyName("email")]
+        public string Email { get; set; } = string.Empty;
+    }
+
+    public class PageResponseWrapper
+    {
+        [JsonPropertyName("content")]
+        public List<PedidoAdminDTO>? Content { get; set; }
+    }
+}

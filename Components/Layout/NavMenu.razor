@@ -1,5 +1,9 @@
 ﻿@inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject HttpClient Http
+@using System.Text.Json
+@using System.Net.Http.Headers
+@implements IDisposable
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4 border-bottom border-secondary py-3 w-100">
     <div class="container-fluid d-flex align-items-center justify-content-between">
@@ -14,30 +18,30 @@
             {
                 @if (isAdmin)
                 {
-                    <!-- Menú Exclusivo Administrador -->
-                    <NavLink class="text-white text-decoration-none small fw-semibold" href="admin/usuarios">Usuarios</NavLink>
-                    <NavLink class="text-white text-decoration-none small fw-semibold" href="admin/productos">Productos</NavLink>
-                    <NavLink class="text-white text-decoration-none small fw-semibold" href="admin/marcas">Marcas</NavLink>
-                    <NavLink class="text-white text-decoration-none small fw-semibold" href="admin/pedidos">Pedidos</NavLink>
+                    <!-- Menú Exclusivo Administrador (Rutas Absolutas) -->
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="/admin/usuarios">Usuarios</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="/admin/productos">Productos</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="/admin/marcas">Marcas</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="/admin/pedidos">Pedidos</NavLink>
                 }
                 else
                 {
                     <!-- Menú Cliente Normal -->
-                    <NavLink class="text-white text-decoration-none small fw-semibold" href="" Match="NavLinkMatch.All">Inicio</NavLink>
-                    <NavLink class="text-white text-decoration-none small fw-semibold" href="catalogo">Catálogo</NavLink>
-                    <NavLink class="text-white text-decoration-none small fw-semibold" href="carrito">Carrito</NavLink>
-                    <NavLink class="text-white text-decoration-none small fw-semibold" href="mis-pedidos">Mis Pedidos</NavLink>
-                    <NavLink class="text-white text-decoration-none small fw-semibold" href="perfil">Mi Perfil</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="/" Match="NavLinkMatch.All">Inicio</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="/catalogo">Catálogo</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="/carrito">Carrito</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="/mis-pedidos">Mis Pedidos</NavLink>
+                    <NavLink class="text-white text-decoration-none small fw-semibold" href="/perfil">Mi Perfil</NavLink>
                 }
 
                 <button class="btn btn-danger btn-sm px-3 py-1 ms-2 rounded-2 fw-semibold" @onclick="CerrarSesion">Cerrar Sesión</button>
             }
             else
             {
-                <NavLink class="text-white text-decoration-none small fw-semibold" href="" Match="NavLinkMatch.All">Inicio</NavLink>
-                <NavLink class="text-white text-decoration-none small fw-semibold" href="catalogo">Catálogo</NavLink>
-                <NavLink class="text-white text-decoration-none small fw-semibold" href="login">Iniciar Sesión</NavLink>
-                <NavLink class="text-white text-decoration-none small fw-semibold" href="registro">Registrarse</NavLink>
+                <NavLink class="text-white text-decoration-none small fw-semibold" href="/" Match="NavLinkMatch.All">Inicio</NavLink>
+                <NavLink class="text-white text-decoration-none small fw-semibold" href="/catalogo">Catálogo</NavLink>
+                <NavLink class="text-white text-decoration-none small fw-semibold" href="/login">Iniciar Sesión</NavLink>
+                <NavLink class="text-white text-decoration-none small fw-semibold" href="/registro">Registrarse</NavLink>
             }
         </div>
     </div>
@@ -47,6 +51,12 @@
     private bool isLoggedIn = false;
     private bool isAdmin = false;
 
+    protected override void OnInitialized()
+    {
+        // Escucha cambios de página para reevaluar la sesión de inmediato
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -55,32 +65,164 @@
         }
     }
 
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        await VerificarSesionYRol();
+        await InvokeAsync(StateHasChanged);
+    }
+
     private async Task VerificarSesionYRol()
     {
         try
         {
+            // 1. Obtener Token
             var token = await JS.InvokeAsync<string>("localStorage.getItem", "authToken");
-            var userEmail = await JS.InvokeAsync<string>("localStorage.getItem", "userEmail");
-            var userRole = await JS.InvokeAsync<string>("localStorage.getItem", "userRole");
+            if (string.IsNullOrEmpty(token))
+            {
+                token = await JS.InvokeAsync<string>("localStorage.getItem", "token");
+            }
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                token = token.Trim('"').Trim();
+                if (token.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                {
+                    token = token.Substring(7).Trim();
+                }
+            }
 
             isLoggedIn = !string.IsNullOrEmpty(token);
 
-            if (isLoggedIn)
-            {
-                isAdmin = (!string.IsNullOrEmpty(userRole) && userRole.Equals("ADMIN", StringComparison.OrdinalIgnoreCase))
-                          || (!string.IsNullOrEmpty(userEmail) && userEmail.Equals("Admin@gmail.com", StringComparison.OrdinalIgnoreCase));
-            }
-            else
+            if (!isLoggedIn)
             {
                 isAdmin = false;
+                StateHasChanged();
+                return;
             }
 
+            // 2. Correo y Rol guardados en localStorage
+            var userEmail = await JS.InvokeAsync<string>("localStorage.getItem", "userEmail");
+            var userRole = await JS.InvokeAsync<string>("localStorage.getItem", "userRole");
+
+            string cleanEmail = (userEmail ?? "").Trim().Trim('"');
+            string cleanRole = (userRole ?? "").Trim().Trim('"').ToUpper();
+
+            // Súper Usuario por Correo Principal
+            if (cleanEmail.Equals("Admin@gmail.com", StringComparison.OrdinalIgnoreCase))
+            {
+                isAdmin = true;
+                StateHasChanged();
+                return;
+            }
+
+            // Verificación previa si ya viene guardado "ADMIN", "ROLE_ADMIN" o "1"
+            if (cleanRole == "ADMIN" || cleanRole == "ROLE_ADMIN" || cleanRole == "1")
+            {
+                isAdmin = true;
+                StateHasChanged();
+                return;
+            }
+
+            // 3. Decodificación directa del Token JWT
+            if (CheckJwtTokenForAdmin(token))
+            {
+                isAdmin = true;
+                StateHasChanged();
+                return;
+            }
+
+            // 4. Consulta directa a la API en tiempo real (Base de Datos)
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, "api/usuarios/perfil");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                var response = await Http.SendAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var jsonRaw = await response.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(jsonRaw);
+                    var root = doc.RootElement;
+
+                    bool esAdminPerfil = false;
+
+                    // Evaluaciones de idRol o rolId numéricos/texto (idRol = 1 en SQL Server)
+                    if (root.TryGetProperty("idRol", out var pIdRol))
+                    {
+                        if (pIdRol.ValueKind == JsonValueKind.Number && pIdRol.GetInt32() == 1) esAdminPerfil = true;
+                        if (pIdRol.ValueKind == JsonValueKind.String && pIdRol.GetString() == "1") esAdminPerfil = true;
+                    }
+                    if (root.TryGetProperty("rolId", out var pRolId))
+                    {
+                        if (pRolId.ValueKind == JsonValueKind.Number && pRolId.GetInt32() == 1) esAdminPerfil = true;
+                        if (pRolId.ValueKind == JsonValueKind.String && pRolId.GetString() == "1") esAdminPerfil = true;
+                    }
+
+                    // Evaluación del nombre de rol
+                    if (root.TryGetProperty("rol", out var pRol))
+                    {
+                        string rVal = pRol.ToString().ToUpper();
+                        if (rVal.Contains("ADMIN") || rVal == "1") esAdminPerfil = true;
+                    }
+
+                    // Respaldo de texto completo del JSON
+                    string upperJson = jsonRaw.ToUpper();
+                    if (upperJson.Contains("\"IDROL\":1") || upperJson.Contains("\"ROLID\":1") || 
+                        upperJson.Contains("\"ID_ROL\":1") || upperJson.Contains("ADMIN") || 
+                        upperJson.Contains("ROLE_ADMIN"))
+                    {
+                        esAdminPerfil = true;
+                    }
+
+                    if (esAdminPerfil)
+                    {
+                        isAdmin = true;
+                        await JS.InvokeVoidAsync("localStorage.setItem", "userRole", "ADMIN");
+                        StateHasChanged();
+                        return;
+                    }
+                }
+            }
+            catch { }
+
+            // Si no se cumple ninguna de las condiciones de Admin, es Cliente
+            isAdmin = false;
             StateHasChanged();
         }
         catch
         {
             isLoggedIn = false;
             isAdmin = false;
+            StateHasChanged();
+        }
+    }
+
+    private static bool CheckJwtTokenForAdmin(string token)
+    {
+        try
+        {
+            var parts = token.Split('.');
+            if (parts.Length < 2) return false;
+
+            string payloadBase64 = parts[1];
+            payloadBase64 = payloadBase64.Replace('-', '+').Replace('_', '/');
+            switch (payloadBase64.Length % 4)
+            {
+                case 2: payloadBase64 += "=="; break;
+                case 3: payloadBase64 += "="; break;
+            }
+
+            byte[] bytes = Convert.FromBase64String(payloadBase64);
+            string jsonPayload = System.Text.Encoding.UTF8.GetString(bytes).ToUpper();
+
+            return jsonPayload.Contains("ADMIN") || 
+                   jsonPayload.Contains("ROLE_ADMIN") || 
+                   jsonPayload.Contains("\"IDROL\":1") || 
+                   jsonPayload.Contains("\"ROL\":1");
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -89,6 +231,7 @@
         try
         {
             await JS.InvokeVoidAsync("localStorage.removeItem", "authToken");
+            await JS.InvokeVoidAsync("localStorage.removeItem", "token");
             await JS.InvokeVoidAsync("localStorage.removeItem", "userEmail");
             await JS.InvokeVoidAsync("localStorage.removeItem", "userRole");
         }
@@ -97,5 +240,10 @@
         isLoggedIn = false;
         isAdmin = false;
         Navigation.NavigateTo("/login", forceLoad: true);
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
     }
 }

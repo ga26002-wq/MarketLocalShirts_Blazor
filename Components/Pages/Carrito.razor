@@ -1,4 +1,5 @@
 ﻿@page "/carrito"
+@rendermode InteractiveServer
 @using MarketLocalShirts.DTOs
 @using MarketLocalShirts.Service.Carrito
 @inject CarritoService CarritoService
@@ -102,7 +103,6 @@
         }
         catch (Exception)
         {
-            // Si la API falla o está apagada, mantenemos la lista limpia sin romper la app
             itemsCarrito = new List<CarritoDTO>();
         }
         finally
@@ -141,12 +141,9 @@
         Navigation.NavigateTo("/catalogo");
     }
 
-    private async Task Pagar()
+    private void Pagar()
     {
-        bool exito = await CarritoService.ProcesarPagoAsync();
-        if (exito)
-        {
-            Navigation.NavigateTo("/mis-pedidos");
-        }
+        // Redirige correctamente a la pantalla de Pago profesional con los inputs de tarjeta
+        Navigation.NavigateTo("/pago");
     }
 }

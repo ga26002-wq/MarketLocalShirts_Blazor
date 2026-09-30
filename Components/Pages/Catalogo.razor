@@ -3,6 +3,8 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @using MarketLocalShirts.Models
+@using System.Text.Json
+@using System.Text.Json.Serialization
 
 <div class="bg-black text-white min-vh-100 py-5 px-3 px-md-5">
     <!-- Título Principal -->
@@ -60,8 +62,29 @@
     }
     else if (!CamisasFiltradas.Any())
     {
-        <div class="text-center py-5 text-secondary">
-            <h5>No se encontraron playeras disponibles.</h5>
+        <!-- MENSAJE CUANDO NO HAY PRODUCTOS O LA MARCA NO TIENE PRENDAS -->
+        <div class="text-center py-5 my-4 bg-dark bg-opacity-50 rounded-4 border border-secondary px-4 mx-auto" style="max-width: 600px;">
+            <div class="mb-3">
+                <span style="font-size: 3rem;">👕</span>
+            </div>
+            <h3 class="fw-bold text-info mb-2">¡Oops! No encontramos resultados</h3>
+            <p class="fs-5 text-white-50 m-0">
+                @if (!string.IsNullOrEmpty(marcaSeleccionada) && string.IsNullOrEmpty(busqueda))
+                {
+                    <span>Por el momento no tenemos playeras registradas para la marca <strong>@marcaSeleccionada</strong>.</span>
+                }
+                else if (!string.IsNullOrEmpty(busqueda))
+                {
+                    <span>No se encontraron playeras que coincidan con la búsqueda "<strong>@busqueda</strong>".</span>
+                }
+                else
+                {
+                    <span>No hay playeras disponibles en la tienda en este momento. Vuelve pronto.</span>
+                }
+            </p>
+            <button class="btn btn-outline-info fw-bold mt-4 px-4 py-2 rounded-pill" @onclick="LimpiarFiltros">
+                Ver todo el catálogo
+            </button>
         </div>
     }
     else
@@ -136,21 +159,62 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await CargarCamisas();
+        await CargarDatos();
     }
 
-    private async Task CargarCamisas()
+    private async Task CargarDatos()
     {
         cargando = true;
         errorMessage = null;
 
         try
         {
+            // 1. Cargar las marcas procesando lista directa O respuesta paginada wrapper
+            try
+            {
+                var marcasResponse = await Http.GetStringAsync("http://localhost:8080/api/marcas");
+                if (!string.IsNullOrWhiteSpace(marcasResponse))
+                {
+                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    string trimmed = marcasResponse.TrimStart();
+
+                    if (trimmed.StartsWith("["))
+                    {
+                        var listaMarcas = JsonSerializer.Deserialize<List<MarcaDTO>>(marcasResponse, options);
+                        if (listaMarcas != null)
+                        {
+                            marcas = listaMarcas.Where(m => !string.IsNullOrWhiteSpace(m.Nombre))
+                                                .Select(m => m.Nombre)
+                                                .Distinct()
+                                                .ToList();
+                        }
+                    }
+                    else
+                    {
+                        var wrapper = JsonSerializer.Deserialize<PageResponseWrapperMarcas>(marcasResponse, options);
+                        if (wrapper?.Content != null)
+                        {
+                            marcas = wrapper.Content.Where(m => !string.IsNullOrWhiteSpace(m.Nombre))
+                                                    .Select(m => m.Nombre)
+                                                    .Distinct()
+                                                    .ToList();
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            // 2. Cargar las camisas desde la API
             var response = await Http.GetFromJsonAsync<List<CamisaDTO>>("http://localhost:8080/api/camisas/lista");
             if (response != null)
             {
                 camisas = response;
-                marcas = camisas.Select(c => c.NombreMarca).Where(m => !string.IsNullOrEmpty(m)).Distinct().ToList();
+                
+                // Respaldo por si no se pudieron cargar de la API de marcas
+                if (!marcas.Any())
+                {
+                    marcas = camisas.Select(c => c.NombreMarca).Where(m => !string.IsNullOrEmpty(m)).Distinct().ToList();
+                }
             }
         }
         catch (Exception ex)
@@ -170,12 +234,10 @@
 
     private string ObtenerImagenValida(CamisaDTO camisa)
     {
-        // Si no tiene URL válida o es de prueba
         if (string.IsNullOrWhiteSpace(camisa.ImagenUrl) || 
             !camisa.ImagenUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase) || 
             camisa.ImagenUrl == "url_imagen_ejemplo")
         {
-            // Retorna una camisa recortada estilo producto según el color/tipo
             if (camisa.Nombre.Contains("azul", StringComparison.OrdinalIgnoreCase))
             {
                 return "https://png.pngtree.com/png-clipart/20230508/original/pngtree-blue-t-shirt-png-image_9153366.png";
@@ -194,6 +256,13 @@
 
     private void AgregarAlCarrito(CamisaDTO camisa)
     {
-        // Próximo paso: Agregar al carrito
+        // Redirige a la pantalla de detalle del producto pasando el ID real
+        Navigation.NavigateTo($"/producto/{camisa.Id}");
+    }
+
+    public class PageResponseWrapperMarcas
+    {
+        [JsonPropertyName("content")]
+        public List<MarcaDTO>? Content { get; set; }
     }
 }
