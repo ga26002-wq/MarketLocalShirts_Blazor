@@ -1,12 +1,8 @@
-﻿@page "/admin/pedidos"
+@page "/admin/pedidos"
 @rendermode InteractiveServer
-@using System.Text.Json
-@using System.Text.Json.Serialization
-@using MarketLocalShirts.Service.Auth
-@inject HttpClient Http
+@inject PedidoService PedidoService
 @inject AuthService AuthService
 @inject NavigationManager Navigation
-@inject IJSRuntime JS
 
 <PageTitle>Administración de Pedidos - MarketLocalShirts</PageTitle>
 
@@ -118,11 +114,9 @@
                 <div class="modal-body py-4">
                     <label class="form-label fw-bold fs-5 mb-2">Selecciona el nuevo estado:</label>
                     <select class="form-select bg-secondary text-white border-0 fs-5 p-3" @bind="nuevoEstadoSeleccionado">
-                        <option value="Pendiente">Pendiente</option>
-                        <option value="Procesando">Procesando</option>
-                        <option value="Enviado">Enviado</option>
-                        <option value="Entregado">Entregado</option>
-                        <option value="Cancelado">Cancelado</option>
+                        <option value="PENDIENTE">PENDIENTE</option>
+                        <option value="CONFIRMADO">CONFIRMADO</option>
+                        <option value="CANCELADO">CANCELADO</option>
                     </select>
                 </div>
                 <div class="modal-footer border-0 d-flex justify-content-center gap-3">
@@ -141,71 +135,37 @@
 }
 
 @code {
-    private List<PedidoAdminDTO> pedidos = new();
+    private List<PedidoSalidaDTO> pedidos = new();
     private string criterioBusqueda = string.Empty;
     private string mensaje = string.Empty;
     private bool cargando = true;
 
-    // Control del Modal
     private bool mostrarModalEstado = false;
-    private PedidoAdminDTO? pedidoSeleccionado = null;
-    private string nuevoEstadoSeleccionado = "Pendiente";
+    private PedidoSalidaDTO? pedidoSeleccionado = null;
+    private string nuevoEstadoSeleccionado = "PENDIENTE";
 
-    private const string ApiBaseUrl = "http://localhost:8080/api/pedidos";
-
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        await CargarPedidosDesdeApi();
+        if (PedidoService.PedidosEnMemoria is not { } lista)
+            return;
+
+        pedidos = lista;
+        cargando = false;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            try
-            {
-                var token = await JS.InvokeAsync<string>("localStorage.getItem", "authToken");
-                if (string.IsNullOrWhiteSpace(token))
-                {
-                    token = await JS.InvokeAsync<string>("localStorage.getItem", "token");
-                }
+        if (!firstRender || !cargando)
+            return;
 
-                if (string.IsNullOrWhiteSpace(token))
-                {
-                    Navigation.NavigateTo("/login");
-                }
-            }
-            catch
-            {
-                Navigation.NavigateTo("/login");
-            }
-        }
-    }
-
-    private async Task<string> ObtenerTokenLimpio()
-    {
-        try
+        if (!await AuthService.IsAuthenticated())
         {
-            var token = await JS.InvokeAsync<string>("localStorage.getItem", "authToken");
-            if (string.IsNullOrWhiteSpace(token))
-            {
-                token = await JS.InvokeAsync<string>("localStorage.getItem", "token");
-            }
+            Navigation.NavigateTo("/login");
+            return;
+        }
 
-            if (!string.IsNullOrEmpty(token))
-            {
-                token = token.Trim('"').Trim();
-                if (token.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-                {
-                    token = token.Substring(7).Trim();
-                }
-            }
-            return token ?? string.Empty;
-        }
-        catch
-        {
-            return string.Empty;
-        }
+        await CargarPedidosDesdeApi();
+        StateHasChanged();
     }
 
     private async Task CargarPedidosDesdeApi()
@@ -213,41 +173,12 @@
         cargando = true;
         try
         {
-            var token = await ObtenerTokenLimpio();
-            using var request = new HttpRequestMessage(HttpMethod.Get, ApiBaseUrl);
-            if (!string.IsNullOrEmpty(token))
-            {
-                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-            }
-
-            var response = await Http.SendAsync(request);
-            if (response.IsSuccessStatusCode)
-            {
-                var jsonString = await response.Content.ReadAsStringAsync();
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-
-                if (!string.IsNullOrWhiteSpace(jsonString))
-                {
-                    if (jsonString.TrimStart().StartsWith("["))
-                    {
-                        var lista = JsonSerializer.Deserialize<List<PedidoAdminDTO>>(jsonString, options);
-                        if (lista != null) pedidos = lista;
-                    }
-                    else
-                    {
-                        var wrapper = JsonSerializer.Deserialize<PageResponseWrapper>(jsonString, options);
-                        if (wrapper?.Content != null) pedidos = wrapper.Content;
-                    }
-                }
-            }
-            else
-            {
-                pedidos = new List<PedidoAdminDTO>();
-            }
+            pedidos = await PedidoService.ObtenerTodosAsync();
         }
-        catch
+        catch (Exception ex)
         {
-            pedidos = new List<PedidoAdminDTO>();
+            pedidos = new List<PedidoSalidaDTO>();
+            mensaje = ex.Message;
         }
         finally
         {
@@ -255,38 +186,26 @@
         }
     }
 
-    private IEnumerable<PedidoAdminDTO> pedidosFiltrados =>
+    private IEnumerable<PedidoSalidaDTO> pedidosFiltrados =>
         string.IsNullOrWhiteSpace(criterioBusqueda)
             ? pedidos
             : pedidos.Where(p => p.Id.ToString().Contains(criterioBusqueda, StringComparison.OrdinalIgnoreCase) ||
                                   ObtenerNombreCliente(p).Contains(criterioBusqueda, StringComparison.OrdinalIgnoreCase) ||
                                   ObtenerEmailCliente(p).Contains(criterioBusqueda, StringComparison.OrdinalIgnoreCase) ||
-                                  p.Estado.Contains(criterioBusqueda, StringComparison.OrdinalIgnoreCase));
+                                  (p.Estado ?? "").Contains(criterioBusqueda, StringComparison.OrdinalIgnoreCase));
 
     private void FiltrarPedidos() { }
 
-    private string ObtenerNombreCliente(PedidoAdminDTO ped)
-    {
-        if (!string.IsNullOrWhiteSpace(ped.ClienteNombre)) return ped.ClienteNombre;
-        if (ped.Usuario != null && !string.IsNullOrWhiteSpace(ped.Usuario.Nombre)) return ped.Usuario.Nombre;
-        return "Cliente MLS";
-    }
+    private static string ObtenerNombreCliente(PedidoSalidaDTO ped) =>
+        string.IsNullOrWhiteSpace(ped.Usuario?.Nombre) ? "Cliente" : ped.Usuario!.Nombre;
 
-    private string ObtenerEmailCliente(PedidoAdminDTO ped)
-    {
-        if (!string.IsNullOrWhiteSpace(ped.ClienteEmail)) return ped.ClienteEmail;
-        if (ped.Usuario != null)
-        {
-            if (!string.IsNullOrWhiteSpace(ped.Usuario.Correo)) return ped.Usuario.Correo;
-            if (!string.IsNullOrWhiteSpace(ped.Usuario.Email)) return ped.Usuario.Email;
-        }
-        return "cliente@gmail.com";
-    }
+    private static string ObtenerEmailCliente(PedidoSalidaDTO ped) =>
+        ped.Usuario?.Correo ?? string.Empty;
 
-    private void AbrirModalEditarEstado(PedidoAdminDTO ped)
+    private void AbrirModalEditarEstado(PedidoSalidaDTO ped)
     {
         pedidoSeleccionado = ped;
-        nuevoEstadoSeleccionado = ped.Estado;
+        nuevoEstadoSeleccionado = string.IsNullOrWhiteSpace(ped.Estado) ? "PENDIENTE" : ped.Estado;
         mostrarModalEstado = true;
         mensaje = string.Empty;
     }
@@ -301,80 +220,21 @@
     {
         if (pedidoSeleccionado == null) return;
 
-        try
+        var estado = new PedidoEstadoDTO { Estado = nuevoEstadoSeleccionado };
+        if (!ValidacionFormulario.EsValido(estado, out var errorValidacion))
         {
-            var token = await ObtenerTokenLimpio();
-            using var request = new HttpRequestMessage(HttpMethod.Put, $"{ApiBaseUrl}/{pedidoSeleccionado.Id}/estado");
-            if (!string.IsNullOrEmpty(token))
-            {
-                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-            }
-
-            var payload = new { estado = nuevoEstadoSeleccionado };
-            request.Content = new StringContent(JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json");
-
-            var response = await Http.SendAsync(request);
-
-            if (response.IsSuccessStatusCode)
-            {
-                pedidoSeleccionado.Estado = nuevoEstadoSeleccionado;
-                mensaje = $"¡Estado del Pedido #{pedidoSeleccionado.Id} actualizado a '{nuevoEstadoSeleccionado}' en SQL Server!";
-            }
-            else
-            {
-                pedidoSeleccionado.Estado = nuevoEstadoSeleccionado;
-                mensaje = $"Estado cambiado localmente a '{nuevoEstadoSeleccionado}'.";
-            }
-
-            CerrarModal();
-            StateHasChanged();
+            mensaje = errorValidacion;
+            return;
         }
-        catch (Exception ex)
-        {
-            mensaje = $"Error de conexión: {ex.Message}";
-            CerrarModal();
-            StateHasChanged();
-        }
-    }
 
-    public class PedidoAdminDTO
-    {
-        [JsonPropertyName("id")]
-        public int Id { get; set; }
+        var resultado = await PedidoService.CambiarEstadoAsync(pedidoSeleccionado.Id, nuevoEstadoSeleccionado);
+        mensaje = resultado.Ok
+            ? $"Pedido #{pedidoSeleccionado.Id} actualizado a {nuevoEstadoSeleccionado}."
+            : resultado.Mensaje;
 
-        [JsonPropertyName("clienteNombre")]
-        public string ClienteNombre { get; set; } = string.Empty;
+        if (resultado.Ok)
+            await CargarPedidosDesdeApi();
 
-        [JsonPropertyName("clienteEmail")]
-        public string ClienteEmail { get; set; } = string.Empty;
-
-        [JsonPropertyName("fecha")]
-        public DateTime Fecha { get; set; } = DateTime.Now;
-
-        [JsonPropertyName("estado")]
-        public string Estado { get; set; } = "Pendiente";
-
-        [JsonPropertyName("usuario")]
-        public UsuarioInfoDTO? Usuario { get; set; }
-
-        public string FechaFormatted => Fecha.ToString("dd/MM/yyyy HH:mm");
-    }
-
-    public class UsuarioInfoDTO
-    {
-        [JsonPropertyName("nombre")]
-        public string Nombre { get; set; } = string.Empty;
-
-        [JsonPropertyName("correo")]
-        public string Correo { get; set; } = string.Empty;
-
-        [JsonPropertyName("email")]
-        public string Email { get; set; } = string.Empty;
-    }
-
-    public class PageResponseWrapper
-    {
-        [JsonPropertyName("content")]
-        public List<PedidoAdminDTO>? Content { get; set; }
+        CerrarModal();
     }
 }

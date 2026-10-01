@@ -1,0 +1,51 @@
+@page "/categoria/create"
+@rendermode InteractiveServer
+@inject CategoriaService CategoriaService
+@inject NavigationManager Navigation
+
+<PageTitle>Crear categoría</PageTitle>
+
+<div class="container my-5 text-white">
+    <h3 class="mb-4">Crear Categoría</h3>
+
+    <EditForm Model="@categoriaGuardar" OnValidSubmit="Guardar">
+        <DataAnnotationsValidator />
+        <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            <InputText class="form-control" @bind-Value="categoriaGuardar.Nombre" />
+            <ValidationMessage For="@(() => categoriaGuardar.Nombre)" class="text-danger fw-bold" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Descripción</label>
+            <InputText class="form-control" @bind-Value="categoriaGuardar.Descripcion" />
+            <ValidationMessage For="@(() => categoriaGuardar.Descripcion)" class="text-danger fw-bold" />
+        </div>
+
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <button type="button" class="btn btn-dark" @onclick="Index">Regresar</button>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger mt-3">@errorMessage</div>
+        }
+    </EditForm>
+</div>
+
+@code {
+    private CategoriaGuardarDTO categoriaGuardar = new();
+    private string? errorMessage;
+
+    private async Task Guardar()
+    {
+        var resultado = await CategoriaService.GuardarAsync(categoriaGuardar, null);
+        if (resultado.Ok)
+        {
+            Index();
+            return;
+        }
+
+        errorMessage = resultado.Mensaje;
+    }
+
+    private void Index() => Navigation.NavigateTo("/categoria/index");
+}

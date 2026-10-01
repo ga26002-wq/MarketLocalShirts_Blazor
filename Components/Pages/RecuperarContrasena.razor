@@ -1,0 +1,50 @@
+@page "/recuperar-contrasena"
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Recuperar contraseña - MarketLocalShirts</PageTitle>
+
+<div class="d-flex align-items-center justify-content-center bg-black text-white px-3 py-5" style="min-height: calc(100vh - 60px);">
+    <div class="card text-white p-4 shadow-lg border-0 rounded-3" style="max-width: 420px; width: 100%; background-color: #2b2b2b !important;">
+        <h2 class="fw-bold fs-4 mb-2 text-center">Recuperar contraseña</h2>
+        <p class="text-light small text-center mb-4">Escribe tu correo. Si está registrado, la API envía el enlace.</p>
+
+        @if (!string.IsNullOrEmpty(mensaje))
+        {
+            <div class="alert @(exito ? "alert-success" : "alert-danger") py-2 text-center small">@mensaje</div>
+        }
+
+        <label class="form-label fw-bold small">Correo</label>
+        <input type="email" class="form-control bg-light text-dark border-0 rounded-2 mb-3" @bind="correo" placeholder="tucorreo@email.com" />
+
+        <button class="btn w-100 fw-bold text-white rounded-2" style="background-color: #00a8ff; border: none;" @onclick="Enviar">
+            Enviar enlace
+        </button>
+
+        <div class="text-center mt-3 small">
+            <a href="/login" class="fw-bold text-decoration-none" style="color: #00a8ff;">Volver al login</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string correo = string.Empty;
+    private string mensaje = string.Empty;
+    private bool exito;
+
+    private async Task Enviar()
+    {
+        mensaje = string.Empty;
+        var solicitud = new RecuperarClaveDTO { Correo = correo?.Trim() ?? string.Empty };
+        if (!ValidacionFormulario.EsValido(solicitud, out var errorValidacion))
+        {
+            exito = false;
+            mensaje = errorValidacion;
+            return;
+        }
+
+        var resultado = await AuthService.SolicitarRecuperacionAsync(solicitud.Correo);
+        exito = resultado.Ok;
+        mensaje = resultado.Mensaje;
+    }
+}

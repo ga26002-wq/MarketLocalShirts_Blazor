@@ -1,0 +1,87 @@
+@page "/categoria/edit/{pId:int}"
+@rendermode InteractiveServer
+@inject CategoriaService CategoriaService
+@inject NavigationManager Navigation
+
+<PageTitle>Modificar categoría</PageTitle>
+
+<div class="container my-5 text-white">
+    <h3 class="mb-4">Modificar Categoría</h3>
+
+    <EditForm Model="categoriaModificar" OnValidSubmit="Modificar">
+        <DataAnnotationsValidator />
+        <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            <InputNumber style="display:none;" @bind-Value="categoriaModificar.Id" />
+            <InputText class="form-control" @bind-Value="categoriaModificar.Nombre" />
+            <ValidationMessage For="@(() => categoriaModificar.Nombre)" class="text-danger fw-bold" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Descripción</label>
+            <InputText class="form-control" @bind-Value="categoriaModificar.Descripcion" />
+            <ValidationMessage For="@(() => categoriaModificar.Descripcion)" class="text-danger fw-bold" />
+        </div>
+
+        <button type="submit" class="btn btn-success">Guardar</button>
+        <button type="button" class="btn btn-dark" @onclick="Index">Regresar</button>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger mt-3">@errorMessage</div>
+        }
+    </EditForm>
+</div>
+
+@code {
+    [Parameter]
+    public int pId { get; set; }
+
+    private CategoriaModificarDTO categoriaModificar = new();
+    private string? errorMessage;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        try
+        {
+            var categoria = await CategoriaService.ObtenerPorIdAsync(pId);
+            if (categoria == null)
+            {
+                errorMessage = "No se encontró la categoría.";
+                StateHasChanged();
+                return;
+            }
+
+            categoriaModificar.Id = categoria.Id;
+            categoriaModificar.Nombre = categoria.Nombre;
+            categoriaModificar.Descripcion = categoria.Descripcion ?? string.Empty;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Modificar()
+    {
+        var resultado = await CategoriaService.GuardarAsync(new CategoriaGuardarDTO
+        {
+            Nombre = categoriaModificar.Nombre,
+            Descripcion = categoriaModificar.Descripcion
+        }, categoriaModificar.Id);
+
+        if (resultado.Ok)
+        {
+            Index();
+            return;
+        }
+
+        errorMessage = resultado.Mensaje;
+    }
+
+    private void Index() => Navigation.NavigateTo("/categoria/index");
+}

@@ -1,0 +1,202 @@
+@page "/admin/categorias"
+@inject CategoriaService CategoriaService
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Categorías - MarketLocalShirts</PageTitle>
+
+<div class="container my-5 text-white">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <h1 class="fw-bold display-4 m-0">Categorías</h1>
+        <button class="btn text-white fw-bold px-4 py-3 fs-5" style="background-color: #00a8ff; border: none;" @onclick="Nueva">
+            + Nueva
+        </button>
+    </div>
+
+    @if (mostrarFormulario)
+    {
+        <div class="bg-dark border border-secondary rounded-4 p-4 mb-4" style="max-width: 640px;">
+            <label class="form-label fw-bold">Nombre</label>
+            <input class="form-control bg-secondary text-white mb-1 @(errores.ContainsKey("Nombre") ? "border border-danger" : "border-0")" @bind="edicion.Nombre" />
+            @if (errores.TryGetValue("Nombre", out var errorNombre))
+            {
+                <div class="text-danger fw-bold mb-2">@errorNombre</div>
+            }
+            <label class="form-label fw-bold mt-2">Descripción</label>
+            <input class="form-control bg-secondary text-white mb-1 @(errores.ContainsKey("Descripcion") ? "border border-danger" : "border-0")" @bind="edicion.Descripcion" />
+            @if (errores.TryGetValue("Descripcion", out var errorDescripcion))
+            {
+                <div class="text-danger fw-bold mb-2">@errorDescripcion</div>
+            }
+            <button class="btn text-white fw-bold me-2" style="background-color: #00a8ff; border: none;" @onclick="Guardar">Guardar</button>
+            <button class="btn btn-light fw-bold" @onclick="Cancelar">Cancelar</button>
+        </div>
+    }
+
+    @if (cargando)
+    {
+        <div class="text-center py-5"><div class="spinner-border text-info"></div></div>
+    }
+    else if (!categorias.Any())
+    {
+        <p class="text-white-50 fs-5">No hay categorías. Crea una antes de registrar camisas.</p>
+    }
+    else
+    {
+        @foreach (var categoria in categorias)
+        {
+            <div class="row align-items-center bg-black py-3 mb-3 rounded border border-secondary px-3">
+                <div class="col-md-8">
+                    <h4 class="fw-bold m-0">@categoria.Nombre</h4>
+                    <p class="text-white-50 m-0">@categoria.Descripcion</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button class="btn btn-warning fw-bold me-2" @onclick="() => Editar(categoria)">Editar</button>
+                    <button class="btn btn-danger fw-bold" @onclick="() => PedirEliminar(categoria)">Eliminar</button>
+                </div>
+            </div>
+        }
+    }
+
+    @if (!string.IsNullOrEmpty(mensaje))
+    {
+        <div class="alert alert-info mt-3">@mensaje</div>
+    }
+</div>
+
+@if (mostrarConfirmacion && categoriaAEliminar != null)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.85);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-white border border-secondary p-3">
+                <div class="modal-header border-0 pb-0">
+                    <h4 class="modal-title fw-bold text-danger">⚠️ Confirmar eliminación</h4>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CancelarEliminar"></button>
+                </div>
+                <div class="modal-body py-4 fs-4 text-center">
+                    ¿Estás seguro de que deseas eliminar la categoría <strong class="text-info">"@categoriaAEliminar.Nombre"</strong>?
+                </div>
+                <div class="modal-footer border-0 d-flex justify-content-center gap-3">
+                    <button type="button" class="btn btn-danger fw-bold px-4 py-2 fs-5" @onclick="ConfirmarEliminar">Sí, eliminar</button>
+                    <button type="button" class="btn btn-secondary fw-bold px-4 py-2 fs-5" @onclick="CancelarEliminar">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<CategoriaSalidaDTO> categorias = new();
+    private CategoriaSalidaDTO edicion = new();
+    private bool mostrarFormulario;
+    private bool cargando = true;
+    private string mensaje = string.Empty;
+    private Dictionary<string, string> errores = new();
+    private bool mostrarConfirmacion;
+    private CategoriaSalidaDTO? categoriaAEliminar;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        if (!await AuthService.IsAuthenticated())
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await Cargar();
+        StateHasChanged();
+    }
+
+    private async Task Cargar()
+    {
+        cargando = true;
+        try
+        {
+            categorias = await CategoriaService.ObtenerTodasAsync();
+        }
+        catch (Exception ex)
+        {
+            mensaje = ex.Message;
+            categorias = new();
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private void Nueva()
+    {
+        edicion = new CategoriaSalidaDTO();
+        mostrarFormulario = true;
+        mensaje = string.Empty;
+    }
+
+    private void Editar(CategoriaSalidaDTO categoria)
+    {
+        edicion = new CategoriaSalidaDTO
+        {
+            Id = categoria.Id,
+            Nombre = categoria.Nombre,
+            Descripcion = categoria.Descripcion
+        };
+        mostrarFormulario = true;
+    }
+
+    private void Cancelar()
+    {
+        mostrarFormulario = false;
+    }
+
+    private async Task Guardar()
+    {
+        var datos = new CategoriaGuardarDTO
+        {
+            Nombre = edicion.Nombre,
+            Descripcion = edicion.Descripcion ?? string.Empty
+        };
+        errores = ValidacionFormulario.Errores(datos);
+        if (errores.Count > 0)
+        {
+            mensaje = "Revisa los campos marcados en rojo.";
+            return;
+        }
+
+        var resultado = await CategoriaService.GuardarAsync(datos, edicion.Id);
+
+        mensaje = resultado.Mensaje;
+        if (resultado.Ok)
+        {
+            mostrarFormulario = false;
+            await Cargar();
+        }
+    }
+
+    private void PedirEliminar(CategoriaSalidaDTO categoria)
+    {
+        categoriaAEliminar = categoria;
+        mostrarConfirmacion = true;
+        mensaje = string.Empty;
+    }
+
+    private void CancelarEliminar()
+    {
+        categoriaAEliminar = null;
+        mostrarConfirmacion = false;
+    }
+
+    private async Task ConfirmarEliminar()
+    {
+        if (categoriaAEliminar == null)
+            return;
+
+        var resultado = await CategoriaService.EliminarAsync(categoriaAEliminar.Id);
+        mensaje = resultado.Ok ? $"Categoría '{categoriaAEliminar.Nombre}' eliminada." : resultado.Mensaje;
+        CancelarEliminar();
+        if (resultado.Ok)
+            await Cargar();
+    }
+}

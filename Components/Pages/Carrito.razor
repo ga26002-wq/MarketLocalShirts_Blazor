@@ -1,14 +1,15 @@
 ﻿@page "/carrito"
 @rendermode InteractiveServer
-@using MarketLocalShirts.DTOs
-@using MarketLocalShirts.Service.Carrito
+@using MarketLocalShirts.DTO.CarritoDTO
+@using MarketLocalShirts.Service
 @inject CarritoService CarritoService
+@inject AuthService AuthService
 @inject NavigationManager Navigation
 
 <PageTitle>Carrito - MarketLocalShirts</PageTitle>
 
 <div class="container my-5 text-white">
-    <h1 class="text-center mb-5 fw-bold display-4">Carrito</h1>
+    <h1 class="text-center mb-4 fw-bold display-4">Carrito</h1>
 
     @if (cargando)
     {
@@ -20,39 +21,64 @@
     }
     else
     {
+        @if (itemsCarrito.Any())
+        {
+            <div class="d-flex justify-content-center gap-2 mb-4">
+                <input type="text"
+                       class="form-control bg-secondary text-white border-0"
+                       style="max-width: 360px;"
+                       placeholder="Buscar producto"
+                       @bind="textoBusqueda"
+                       @bind:event="oninput" />
+                <button class="btn btn-info text-white fw-bold px-4" type="button" @onclick="Buscar">Buscar</button>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(mensaje))
+        {
+            <div class="alert alert-warning text-center">@mensaje</div>
+        }
+
         <div class="table-responsive rounded shadow-sm">
             <table class="table table-dark table-hover align-middle mb-0 text-center">
                 <thead class="table-light text-dark fs-5">
                     <tr>
                         <th class="text-start ps-4">Producto</th>
                         <th>Precio</th>
-                        <th style="width: 160px;">Cant.</th>
+                        <th style="width: 180px;">Cant.</th>
                         <th>SubTotal</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="fs-5">
-                    @if (itemsCarrito != null && itemsCarrito.Any())
+                    @if (ItemsVisibles.Any())
                     {
-                        @foreach (var item in itemsCarrito)
+                        @foreach (var item in ItemsVisibles)
                         {
                             <tr>
-                                <td class="text-start ps-4 fw-semibold">@item.NombreProducto</td>
+                                <td class="text-start ps-4 fw-semibold">
+                                    @item.NombreProducto
+                                    @if (!string.IsNullOrWhiteSpace(item.Talla))
+                                    {
+                                        <span class="text-info">(@item.Talla)</span>
+                                    }
+                                </td>
                                 <td>$@item.Precio.ToString("F2")</td>
                                 <td>
                                     <div class="input-group justify-content-center">
-                                        <input type="number" 
-                                               class="form-control text-center bg-secondary text-white border-0 fw-bold" 
-                                               @bind="item.Cantidad" 
-                                               min="1" 
+                                        <input type="number"
+                                               class="form-control text-center bg-secondary text-white border-0 fw-bold"
+                                               @bind="item.Cantidad"
+                                               @bind:event="oninput"
+                                               min="1"
                                                style="max-width: 70px;" />
-                                        <button class="btn btn-info text-white fw-bold px-3" 
+                                        <button class="btn btn-info text-white fw-bold px-3"
                                                 @onclick="() => ActualizarCantidad(item.Id, item.Cantidad)">OK</button>
                                     </div>
                                 </td>
                                 <td class="fw-bold">$@item.SubTotal.ToString("F2")</td>
                                 <td>
-                                    <button class="btn btn-info text-white fw-bold px-4" 
+                                    <button class="btn btn-info text-white fw-bold px-4"
                                             @onclick="() => EliminarProducto(item.Id)">Quitar</button>
                                 </td>
                             </tr>
@@ -62,7 +88,7 @@
                     {
                         <tr>
                             <td colspan="5" class="text-center py-5 text-muted fs-4">
-                                Tu carrito está vacío.
+                                @(itemsCarrito.Any() ? "Ningún producto coincide con la búsqueda." : "Tu carrito está vacío.")
                             </td>
                         </tr>
                     }
@@ -70,16 +96,15 @@
             </table>
         </div>
 
-        <!-- Total y Navegación -->
         <div class="row align-items-center mt-5">
             <div class="col-md-6 mb-3 mb-md-0">
                 <h2 class="fw-bold m-0">Total: $@CalcularTotal().ToString("F2")</h2>
             </div>
             <div class="col-md-6 d-flex justify-content-md-end gap-3">
                 <button class="btn btn-info text-white fw-bold px-4 py-2 fs-5" @onclick="SeguirComprando">Seguir</button>
-                <button class="btn btn-info text-white fw-bold px-4 py-2 fs-5" 
-                        @onclick="Pagar" 
-                        disabled="@(itemsCarrito == null || !itemsCarrito.Any())">Pagar</button>
+                <button class="btn btn-info text-white fw-bold px-4 py-2 fs-5"
+                        @onclick="Pagar"
+                        disabled="@(!itemsCarrito.Any())">Pagar</button>
             </div>
         </div>
     }
@@ -88,20 +113,32 @@
 @code {
     private List<CarritoDTO> itemsCarrito = new();
     private bool cargando = true;
+    private string textoBusqueda = string.Empty;
+    private string filtro = string.Empty;
+    private string mensaje = string.Empty;
+
+    private IEnumerable<CarritoDTO> ItemsVisibles =>
+        string.IsNullOrWhiteSpace(filtro)
+            ? itemsCarrito
+            : itemsCarrito.Where(item =>
+                item.NombreProducto.Contains(filtro.Trim(), StringComparison.OrdinalIgnoreCase)
+                || item.Talla.Contains(filtro.Trim(), StringComparison.OrdinalIgnoreCase));
 
     protected override async Task OnInitializedAsync()
     {
         await CargarCarrito();
     }
 
-    private async Task CargarCarrito()
+    private async Task CargarCarrito(bool mostrarCarga = true)
     {
-        cargando = true;
+        if (mostrarCarga)
+            cargando = true;
+
         try
         {
-            itemsCarrito = await CarritoService.ObtenerCarritoAsync();
+            itemsCarrito = await CarritoService.ObtenerAsync();
         }
-        catch (Exception)
+        catch
         {
             itemsCarrito = new List<CarritoDTO>();
         }
@@ -111,29 +148,32 @@
         }
     }
 
+    private void Buscar()
+    {
+        filtro = textoBusqueda.Trim();
+        mensaje = string.Empty;
+    }
+
     private decimal CalcularTotal()
     {
-        return itemsCarrito?.Sum(x => x.SubTotal) ?? 0m;
+        return itemsCarrito.Sum(x => x.SubTotal);
     }
 
     private async Task ActualizarCantidad(int idItem, int nuevaCantidad)
     {
-        if (nuevaCantidad < 1) return;
-        
-        bool exito = await CarritoService.ActualizarCantidadAsync(idItem, nuevaCantidad);
-        if (exito)
-        {
-            await CargarCarrito();
-        }
+        if (nuevaCantidad < 1)
+            nuevaCantidad = 1;
+
+        await CarritoService.ActualizarCantidadAsync(idItem, nuevaCantidad);
+        mensaje = string.Empty;
+        await CargarCarrito(mostrarCarga: false);
     }
 
     private async Task EliminarProducto(int idItem)
     {
-        bool exito = await CarritoService.EliminarDelCarritoAsync(idItem);
-        if (exito)
-        {
-            await CargarCarrito();
-        }
+        await CarritoService.EliminarAsync(idItem);
+        mensaje = string.Empty;
+        await CargarCarrito(mostrarCarga: false);
     }
 
     private void SeguirComprando()
@@ -141,9 +181,28 @@
         Navigation.NavigateTo("/catalogo");
     }
 
-    private void Pagar()
+    private async Task Pagar()
     {
-        // Redirige correctamente a la pantalla de Pago profesional con los inputs de tarjeta
+        mensaje = string.Empty;
+
+        if (!itemsCarrito.Any())
+        {
+            mensaje = "Agrega un producto antes de pagar.";
+            return;
+        }
+
+        if (itemsCarrito.Any(item => string.IsNullOrWhiteSpace(item.Talla)))
+        {
+            mensaje = "Cada producto necesita una talla. Quita la línea y agrégala de nuevo desde el detalle del producto.";
+            return;
+        }
+
+        if (!await AuthService.IsAuthenticated())
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
         Navigation.NavigateTo("/pago");
     }
 }

@@ -1,8 +1,9 @@
 ﻿@page "/pago"
 @rendermode InteractiveServer
-@inject MarketLocalShirts.Service.Carrito.CarritoService CarritoService
+@inject CarritoService CarritoService
 @inject NavigationManager Navigation
-@using MarketLocalShirts.DTOs
+@using System.ComponentModel.DataAnnotations
+@using MarketLocalShirts.DTO.CarritoDTO
 
 <PageTitle>Pago - MarketLocalShirts</PageTitle>
 
@@ -17,17 +18,29 @@
     <div class="card bg-dark border border-secondary rounded-4 p-4 p-md-5 mx-auto shadow-lg" style="max-width: 650px;">
         <div class="mb-3">
             <label class="form-label text-white fw-bold mb-1">Nombre</label>
-            <input type="text" class="form-control bg-secondary text-white border-0 p-3 rounded-2" autocomplete="off" placeholder="Nombre completo" @bind="nombre" />
+            <input type="text" class="form-control bg-secondary text-white p-3 rounded-2 @(errores.ContainsKey("Nombre") ? "border border-danger" : "border-0")" autocomplete="off" placeholder="Nombre completo" @bind="nombre" />
+            @if (errores.TryGetValue("Nombre", out var errorNombre))
+            {
+                <div class="text-danger fw-bold mt-1">@errorNombre</div>
+            }
         </div>
 
         <div class="mb-3">
             <label class="form-label text-white fw-bold mb-1">Correo</label>
-            <input type="email" class="form-control bg-secondary text-white border-0 p-3 rounded-2" autocomplete="off" placeholder="correo@ejemplo.com" @bind="correo" />
+            <input type="email" class="form-control bg-secondary text-white p-3 rounded-2 @(errores.ContainsKey("Correo") ? "border border-danger" : "border-0")" autocomplete="off" placeholder="correo@ejemplo.com" @bind="correo" />
+            @if (errores.TryGetValue("Correo", out var errorCorreo))
+            {
+                <div class="text-danger fw-bold mt-1">@errorCorreo</div>
+            }
         </div>
 
         <div class="mb-4">
             <label class="form-label text-white fw-bold mb-1">Direccion</label>
-            <input type="text" class="form-control bg-secondary text-white border-0 p-3 rounded-2" autocomplete="off" placeholder="Dirección de entrega" @bind="direccion" />
+            <input type="text" class="form-control bg-secondary text-white p-3 rounded-2 @(errores.ContainsKey("Direccion") ? "border border-danger" : "border-0")" autocomplete="off" placeholder="Dirección de entrega" @bind="direccion" />
+            @if (errores.TryGetValue("Direccion", out var errorDireccion))
+            {
+                <div class="text-danger fw-bold mt-1">@errorDireccion</div>
+            }
         </div>
 
         <hr class="border-secondary mb-4" />
@@ -36,42 +49,58 @@
 
         <div class="mb-3">
             <label class="form-label text-white fw-bold mb-1">Titular</label>
-            <input type="text" class="form-control bg-secondary text-white border-0 p-3 rounded-2" autocomplete="off" placeholder="Nombre en la tarjeta" @bind="titularTarjeta" />
+            <input type="text" class="form-control bg-secondary text-white p-3 rounded-2 @(errores.ContainsKey("Titular") ? "border border-danger" : "border-0")" autocomplete="off" placeholder="Nombre en la tarjeta" @bind="titularTarjeta" />
+            @if (errores.TryGetValue("Titular", out var errorTitular))
+            {
+                <div class="text-danger fw-bold mt-1">@errorTitular</div>
+            }
         </div>
 
         <!-- Número de Tarjeta con formato automático de 4 en 4 -->
         <div class="mb-3">
             <label class="form-label text-white fw-bold mb-1">Numero</label>
-            <input type="text" class="form-control bg-secondary text-white border-0 p-3 rounded-2" 
+            <input type="text" class="form-control bg-secondary text-white p-3 rounded-2 @(errores.ContainsKey("Numero") ? "border border-danger" : "border-0")" 
                    maxlength="19" 
                    autocomplete="off" 
                    placeholder="4444 4444 4444 4444" 
                    @bind="numeroTarjeta" 
                    @bind:event="oninput" />
+            @if (errores.TryGetValue("Numero", out var errorNumero))
+            {
+                <div class="text-danger fw-bold mt-1">@errorNumero</div>
+            }
         </div>
 
         <div class="row g-3 mb-5">
             <div class="col-6">
                 <label class="form-label text-white fw-bold mb-1">Vence</label>
                 <!-- Vencimiento con formato automático MM/AA -->
-                <input type="text" class="form-control bg-secondary text-white border-0 p-3 rounded-2 text-center" 
+                <input type="text" class="form-control bg-secondary text-white p-3 rounded-2 text-center @(errores.ContainsKey("Vencimiento") ? "border border-danger" : "border-0")" 
                        maxlength="5" 
                        name="no-vence-field"
                        autocomplete="off" 
                        placeholder="MM/AA" 
                        @bind="vencimiento" 
                        @bind:event="oninput" />
+                @if (errores.TryGetValue("Vencimiento", out var errorVence))
+                {
+                    <div class="text-danger fw-bold mt-1">@errorVence</div>
+                }
             </div>
             <div class="col-6">
                 <label class="form-label text-white fw-bold mb-1">CVV</label>
                 <!-- CVV limitado estrictamente a 3 dígitos -->
-                <input type="password" class="form-control bg-secondary text-white border-0 p-3 rounded-2 text-center" 
+                <input type="password" class="form-control bg-secondary text-white p-3 rounded-2 text-center @(errores.ContainsKey("Cvv") ? "border border-danger" : "border-0")" 
                        maxlength="3" 
                        name="no-cvv-field"
                        autocomplete="new-password" 
                        placeholder="123" 
                        @bind="cvv" 
                        @bind:event="oninput" />
+                @if (errores.TryGetValue("Cvv", out var errorCvv))
+                {
+                    <div class="text-danger fw-bold mt-1">@errorCvv</div>
+                }
             </div>
         </div>
 
@@ -173,10 +202,11 @@
     }
 
     private string mensajeError = string.Empty;
+    private Dictionary<string, string> errores = new();
 
     protected override async Task OnInitializedAsync()
     {
-        var items = await CarritoService.ObtenerCarritoAsync();
+        var items = await CarritoService.ObtenerAsync();
         if (items != null)
         {
             totalGeneral = items.Sum(x => x.SubTotal);
@@ -191,71 +221,89 @@
     private async Task ProcesarPagoFinal()
     {
         mensajeError = string.Empty;
-
-        if (string.IsNullOrWhiteSpace(nombre) || string.IsNullOrWhiteSpace(correo) || 
-            string.IsNullOrWhiteSpace(direccion) || string.IsNullOrWhiteSpace(numeroTarjeta) || 
-            string.IsNullOrWhiteSpace(vencimiento) || string.IsNullOrWhiteSpace(cvv))
+        var datos = new DatosPago
         {
-            mensajeError = "Por favor completa todos los campos obligatorios para procesar tu pago.";
-            return;
-        }
+            Nombre = nombre,
+            Correo = correo,
+            Direccion = direccion,
+            Titular = titularTarjeta,
+            Numero = new string(numeroTarjeta.Where(char.IsDigit).ToArray()),
+            Vencimiento = vencimiento,
+            Cvv = cvv
+        };
+        errores = ValidacionFormulario.Errores(datos);
+        if (errores.TryGetValue("Vencimiento", out _) == false)
+            ValidarVencimiento();
 
-        // Validar CVV exacto de 3 dígitos
-        if (cvv.Length < 3)
+        if (errores.Count > 0)
         {
-            mensajeError = "El CVV debe tener exactamente 3 dígitos.";
-            return;
-        }
-
-        // Validar que la tarjeta no esté vencida
-        if (vencimiento.Length == 5 && vencimiento.Contains('/'))
-        {
-            var partes = vencimiento.Split('/');
-            if (int.TryParse(partes[0], out int mes) && int.TryParse(partes[1], out int anioCorto))
-            {
-                if (mes < 1 || mes > 12)
-                {
-                    mensajeError = "El mes de vencimiento no es válido (debe ser 01 al 12).";
-                    return;
-                }
-
-                int anio = 2000 + anioCorto;
-                var fechaActual = DateTime.Now;
-                var fechaVencimiento = new DateTime(anio, mes, DateTime.DaysInMonth(anio, mes));
-
-                if (fechaVencimiento < fechaActual)
-                {
-                    mensajeError = "La tarjeta ingresada está vencida. Por favor usa una vigentes.";
-                    return;
-                }
-            }
-            else
-            {
-                mensajeError = "El formato de vencimiento es inválido (usa MM/AA).";
-                return;
-            }
-        }
-        else
-        {
-            mensajeError = "Debes ingresar una fecha de vencimiento completa (MM/AA).";
+            mensajeError = "Revisa los campos marcados en rojo.";
             return;
         }
 
         try
         {
-            bool exito = await CarritoService.ProcesarPagoAsync();
-            if (exito)
+            var resultado = await CarritoService.PagarAsync();
+            if (resultado.Ok)
             {
                 Navigation.NavigateTo("/mis-pedidos");
             }
             else
             {
-                mensajeError = "La pasarela de pago rechazó la transacción. Verifica tus datos.";
+                mensajeError = resultado.Mensaje;
             }
         }
         catch (Exception ex)
         {
             mensajeError = $"Error en el servidor al procesar el pago: {ex.Message}";
         }
+    }
+
+    private void ValidarVencimiento()
+    {
+        if (vencimiento.Length != 5 || !vencimiento.Contains('/'))
+        {
+            errores["Vencimiento"] = "Debes ingresar una fecha de vencimiento completa (MM/AA).";
+            return;
+        }
+
+        var partes = vencimiento.Split('/');
+        if (!int.TryParse(partes[0], out int mes) || !int.TryParse(partes[1], out int anioCorto) || mes < 1 || mes > 12)
+        {
+            errores["Vencimiento"] = "El mes de vencimiento no es válido (debe ser 01 al 12).";
+            return;
+        }
+
+        int anio = 2000 + anioCorto;
+        var fechaVencimiento = new DateTime(anio, mes, DateTime.DaysInMonth(anio, mes));
+        if (fechaVencimiento < DateTime.Now)
+            errores["Vencimiento"] = "La tarjeta ingresada está vencida.";
+    }
+
+    private sealed class DatosPago
+    {
+        [Required(ErrorMessage = "El nombre es obligatorio")]
+        public string Nombre { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "El correo es obligatorio")]
+        [EmailAddress(ErrorMessage = "Debes escribir un correo válido, por ejemplo nombre@correo.com")]
+        public string Correo { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "La dirección es obligatoria")]
+        public string Direccion { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "El titular de la tarjeta es obligatorio")]
+        public string Titular { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "El número de tarjeta es obligatorio")]
+        [RegularExpression(@"^\d{16}$", ErrorMessage = "El número de tarjeta debe tener 16 dígitos")]
+        public string Numero { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "La fecha de vencimiento es obligatoria")]
+        public string Vencimiento { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "El CVV es obligatorio")]
+        [RegularExpression(@"^\d{3}$", ErrorMessage = "El CVV debe tener 3 dígitos")]
+        public string Cvv { get; set; } = string.Empty;
     }
 }

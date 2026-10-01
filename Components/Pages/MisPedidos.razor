@@ -1,8 +1,8 @@
-﻿@page "/mis-pedidos"
+@page "/mis-pedidos"
 @rendermode InteractiveServer
-@inject MarketLocalShirts.Service.Carrito.CarritoService CarritoService
+@inject PedidoService PedidoService
+@inject AuthService AuthService
 @inject NavigationManager Navigation
-@using MarketLocalShirts.DTOs
 
 <PageTitle>Mis Pedidos - MarketLocalShirts</PageTitle>
 
@@ -18,10 +18,21 @@
             <p class="mt-3">Cargando tus pedidos...</p>
         </div>
     }
+    else if (!string.IsNullOrEmpty(mensaje))
+    {
+        <div class="text-center py-5">
+            <p class="fs-5 text-secondary">@mensaje</p>
+            @if (pedirLogin)
+            {
+                <button class="btn btn-info text-white fw-bold px-4" @onclick="IrAlLogin">Iniciar sesión</button>
+            }
+        </div>
+    }
     else if (!listaPedidos.Any())
     {
         <div class="text-center text-secondary py-5">
             <p class="fs-5">No tienes pedidos registrados por el momento.</p>
+            <button class="btn btn-info text-white fw-bold px-4" @onclick="IrAlCatalogo">Ir al catálogo</button>
         </div>
     }
     else
@@ -30,23 +41,21 @@
             @foreach (var pedido in listaPedidos)
             {
                 <div class="card bg-dark border border-secondary rounded-4 p-4 mb-4 shadow-lg">
-                    <!-- Cabecera del Pedido -->
                     <div class="d-flex justify-content-between align-items-start mb-3">
                         <div>
                             <h3 class="fw-bold text-white mb-1">Pedido #@pedido.Id</h3>
                             <p class="text-secondary mb-0">@pedido.Fecha.ToString("dd/MM/yyyy HH:mm")</p>
                         </div>
                         <div class="text-end">
-                            <span class="d-block fw-bold text-white fs-5">@(string.IsNullOrEmpty(pedido.Estado) ? "Completado" : pedido.Estado)</span>
+                            <span class="d-block fw-bold text-white fs-5">@pedido.EstadoTexto</span>
                             <span class="text-info fw-bold fs-4">$@pedido.Total.ToString("F2")</span>
                         </div>
                     </div>
 
-                    <!-- Tabla de Productos del Pedido -->
                     <div class="table-responsive mb-4">
                         <table class="table table-dark table-borderless align-middle mb-0">
                             <thead>
-                                <tr class="bg-secondary text-dark fw-bold rounded-top">
+                                <tr class="text-dark fw-bold" style="background-color: #d9d9d9;">
                                     <th class="py-2 px-3">Producto</th>
                                     <th class="py-2 px-3 text-center">Cant.</th>
                                     <th class="py-2 px-3 text-end">SubTotal</th>
@@ -68,9 +77,8 @@
                         </table>
                     </div>
 
-                    <!-- Botón Ver Factura -->
                     <div>
-                        <button class="btn fw-bold py-2 px-4 rounded-2 text-dark btn-factura" 
+                        <button class="btn fw-bold py-2 px-4 rounded-2 text-dark btn-factura"
                                 style="background-color: #00a8ff; border: none;"
                                 @onclick="() => VerFactura(pedido.Id)">
                             Ver Factura
@@ -90,27 +98,82 @@
 </style>
 
 @code {
-    private List<PedidoDTO>? listaPedidos;
+    private List<PedidoSalidaDTO>? listaPedidos;
+    private string mensaje = string.Empty;
+    private bool pedirLogin;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
+        var perfil = AuthService.PerfilEnMemoria;
+        if (perfil == null || !PedidoService.TryPedidosDeUsuario(perfil.Id, out var pedidos))
+            return;
+
+        listaPedidos = pedidos
+            .OrderByDescending(pedido => pedido.Fecha)
+            .ThenByDescending(pedido => pedido.Id)
+            .ToList();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || listaPedidos != null)
+            return;
+
         await CargarPedidos();
+        StateHasChanged();
     }
 
     private async Task CargarPedidos()
     {
+        mensaje = string.Empty;
+        pedirLogin = false;
+
         try
         {
-            listaPedidos = await CarritoService.ObtenerPedidosAsync();
+            if (!await AuthService.IsAuthenticated())
+            {
+                listaPedidos = new List<PedidoSalidaDTO>();
+                pedirLogin = true;
+                mensaje = "Inicia sesión para ver tus pedidos.";
+                return;
+            }
+
+            var perfil = await AuthService.ObtenerPerfilAsync();
+            if (perfil == null)
+            {
+                listaPedidos = new List<PedidoSalidaDTO>();
+                pedirLogin = true;
+                mensaje = "Inicia sesión con una cuenta de cliente para ver tus pedidos.";
+                return;
+            }
+
+            var pedidos = await PedidoService.ObtenerPorUsuarioAsync(perfil.Id);
+            listaPedidos = pedidos
+                .OrderByDescending(pedido => pedido.Fecha)
+                .ThenByDescending(pedido => pedido.Id)
+                .ToList();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            listaPedidos = new List<PedidoDTO>();
+            listaPedidos = new List<PedidoSalidaDTO>();
+            mensaje = string.IsNullOrWhiteSpace(ex.Message)
+                ? "No se pudieron cargar los pedidos."
+                : ex.Message;
         }
     }
 
-    private void VerFactura(int idPedido)
+    private void VerFactura(int pedidoId)
     {
-        Navigation.NavigateTo($"/factura/{idPedido}");
+        Navigation.NavigateTo($"/factura/{pedidoId}");
+    }
+
+    private void IrAlLogin()
+    {
+        Navigation.NavigateTo("/login");
+    }
+
+    private void IrAlCatalogo()
+    {
+        Navigation.NavigateTo("/catalogo");
     }
 }

@@ -1,0 +1,78 @@
+@page "/marca/edit/{pId:int}"
+@rendermode InteractiveServer
+@inject MarcaService MarcaService
+@inject NavigationManager Navigation
+
+<PageTitle>Modificar marca</PageTitle>
+
+<div class="container my-5 text-white">
+    <h3 class="mb-4">Modificar Marca</h3>
+
+    <EditForm Model="marcaModificar" OnValidSubmit="Modificar">
+        <DataAnnotationsValidator />
+        <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            <InputText class="form-control" @bind-Value="marcaModificar.Nombre" />
+            <ValidationMessage For="@(() => marcaModificar.Nombre)" class="text-danger fw-bold" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Descripción</label>
+            <InputText class="form-control" @bind-Value="marcaModificar.Descripcion" />
+            <ValidationMessage For="@(() => marcaModificar.Descripcion)" class="text-danger fw-bold" />
+        </div>
+
+        <button type="submit" class="btn btn-success">Guardar</button>
+        <button type="button" class="btn btn-dark" @onclick="Index">Regresar</button>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger mt-3">@errorMessage</div>
+        }
+    </EditForm>
+</div>
+
+@code {
+    [Parameter]
+    public int pId { get; set; }
+
+    private MarcaModificarDTO marcaModificar = new();
+    private string? errorMessage;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var marca = await MarcaService.ObtenerPorIdAsync(pId);
+        if (marca == null)
+        {
+            errorMessage = "No se encontró la marca.";
+            StateHasChanged();
+            return;
+        }
+
+        marcaModificar.Id = marca.Id;
+        marcaModificar.Nombre = marca.Nombre;
+        marcaModificar.Descripcion = marca.Descripcion ?? string.Empty;
+        StateHasChanged();
+    }
+
+    private async Task Modificar()
+    {
+        var resultado = await MarcaService.GuardarAsync(new MarcaGuardarDTO
+        {
+            Nombre = marcaModificar.Nombre,
+            Descripcion = marcaModificar.Descripcion
+        }, marcaModificar.Id);
+
+        if (resultado.Ok)
+        {
+            Index();
+            return;
+        }
+
+        errorMessage = resultado.Mensaje;
+    }
+
+    private void Index() => Navigation.NavigateTo("/marca/index");
+}

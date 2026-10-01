@@ -1,0 +1,51 @@
+@page "/marca/create"
+@rendermode InteractiveServer
+@inject MarcaService MarcaService
+@inject NavigationManager Navigation
+
+<PageTitle>Crear marca</PageTitle>
+
+<div class="container my-5 text-white">
+    <h3 class="mb-4">Crear Marca</h3>
+
+    <EditForm Model="@marcaGuardar" OnValidSubmit="Guardar">
+        <DataAnnotationsValidator />
+        <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            <InputText class="form-control" @bind-Value="marcaGuardar.Nombre" />
+            <ValidationMessage For="@(() => marcaGuardar.Nombre)" class="text-danger fw-bold" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Descripción</label>
+            <InputText class="form-control" @bind-Value="marcaGuardar.Descripcion" />
+            <ValidationMessage For="@(() => marcaGuardar.Descripcion)" class="text-danger fw-bold" />
+        </div>
+
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <button type="button" class="btn btn-dark" @onclick="Index">Regresar</button>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger mt-3">@errorMessage</div>
+        }
+    </EditForm>
+</div>
+
+@code {
+    private MarcaGuardarDTO marcaGuardar = new();
+    private string? errorMessage;
+
+    private async Task Guardar()
+    {
+        var resultado = await MarcaService.GuardarAsync(marcaGuardar, null);
+        if (resultado.Ok)
+        {
+            Index();
+            return;
+        }
+
+        errorMessage = resultado.Mensaje;
+    }
+
+    private void Index() => Navigation.NavigateTo("/marca/index");
+}

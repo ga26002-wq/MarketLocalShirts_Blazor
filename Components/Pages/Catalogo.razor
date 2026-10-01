@@ -1,10 +1,8 @@
-﻿@page "/catalogo"
+@page "/catalogo"
 @rendermode InteractiveServer
-@inject HttpClient Http
+@inject CamisaService CamisaService
+@inject MarcaService MarcaService
 @inject NavigationManager Navigation
-@using MarketLocalShirts.Models
-@using System.Text.Json
-@using System.Text.Json.Serialization
 
 <div class="bg-black text-white min-vh-100 py-5 px-3 px-md-5">
     <!-- Título Principal -->
@@ -150,7 +148,7 @@
 </style>
 
 @code {
-    private List<CamisaDTO> camisas = new();
+    private List<CamisaSalidaDTO> camisas = new();
     private List<string> marcas = new();
     private string busqueda = string.Empty;
     private string marcaSeleccionada = string.Empty;
@@ -169,53 +167,14 @@
 
         try
         {
-            // 1. Cargar las marcas procesando lista directa O respuesta paginada wrapper
-            try
-            {
-                var marcasResponse = await Http.GetStringAsync("http://localhost:8080/api/marcas");
-                if (!string.IsNullOrWhiteSpace(marcasResponse))
-                {
-                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                    string trimmed = marcasResponse.TrimStart();
+            var marcasTask = MarcaService.ObtenerTodasAsync();
+            var camisasTask = CamisaService.ObtenerTodasAsync();
+            await Task.WhenAll(marcasTask, camisasTask);
 
-                    if (trimmed.StartsWith("["))
-                    {
-                        var listaMarcas = JsonSerializer.Deserialize<List<MarcaDTO>>(marcasResponse, options);
-                        if (listaMarcas != null)
-                        {
-                            marcas = listaMarcas.Where(m => !string.IsNullOrWhiteSpace(m.Nombre))
-                                                .Select(m => m.Nombre)
-                                                .Distinct()
-                                                .ToList();
-                        }
-                    }
-                    else
-                    {
-                        var wrapper = JsonSerializer.Deserialize<PageResponseWrapperMarcas>(marcasResponse, options);
-                        if (wrapper?.Content != null)
-                        {
-                            marcas = wrapper.Content.Where(m => !string.IsNullOrWhiteSpace(m.Nombre))
-                                                    .Select(m => m.Nombre)
-                                                    .Distinct()
-                                                    .ToList();
-                        }
-                    }
-                }
-            }
-            catch { }
-
-            // 2. Cargar las camisas desde la API
-            var response = await Http.GetFromJsonAsync<List<CamisaDTO>>("http://localhost:8080/api/camisas/lista");
-            if (response != null)
-            {
-                camisas = response;
-                
-                // Respaldo por si no se pudieron cargar de la API de marcas
-                if (!marcas.Any())
-                {
-                    marcas = camisas.Select(c => c.NombreMarca).Where(m => !string.IsNullOrEmpty(m)).Distinct().ToList();
-                }
-            }
+            marcas = marcasTask.Result.Select(m => m.Nombre).Where(n => !string.IsNullOrWhiteSpace(n)).Distinct().ToList();
+            camisas = camisasTask.Result;
+            if (!marcas.Any())
+                marcas = camisas.Select(c => c.NombreMarca).Where(m => !string.IsNullOrEmpty(m)).Distinct().ToList();
         }
         catch (Exception ex)
         {
@@ -227,12 +186,12 @@
         }
     }
 
-    private IEnumerable<CamisaDTO> CamisasFiltradas => camisas.Where(c =>
+    private IEnumerable<CamisaSalidaDTO> CamisasFiltradas => camisas.Where(c =>
         (string.IsNullOrEmpty(busqueda) || c.Nombre.Contains(busqueda, StringComparison.OrdinalIgnoreCase) || c.Descripcion.Contains(busqueda, StringComparison.OrdinalIgnoreCase)) &&
         (string.IsNullOrEmpty(marcaSeleccionada) || c.NombreMarca.Equals(marcaSeleccionada, StringComparison.OrdinalIgnoreCase))
     );
 
-    private string ObtenerImagenValida(CamisaDTO camisa)
+    private string ObtenerImagenValida(CamisaSalidaDTO camisa)
     {
         if (string.IsNullOrWhiteSpace(camisa.ImagenUrl) || 
             !camisa.ImagenUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase) || 
@@ -254,15 +213,9 @@
         marcaSeleccionada = string.Empty;
     }
 
-    private void AgregarAlCarrito(CamisaDTO camisa)
+    private void AgregarAlCarrito(CamisaSalidaDTO camisa)
     {
         // Redirige a la pantalla de detalle del producto pasando el ID real
         Navigation.NavigateTo($"/producto/{camisa.Id}");
-    }
-
-    public class PageResponseWrapperMarcas
-    {
-        [JsonPropertyName("content")]
-        public List<MarcaDTO>? Content { get; set; }
     }
 }

@@ -1,0 +1,134 @@
+@page "/marca/index"
+@rendermode InteractiveServer
+@inject MarcaService MarcaService
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Marcas</PageTitle>
+
+<div class="container my-5 text-white">
+    <h3 class="fw-bold mb-4">Lista de Marcas</h3>
+    <button type="button" class="btn btn-primary mb-3" @onclick="Nueva">Nueva Marca</button>
+
+    @if (marcas == null)
+    {
+        <p><em>Cargando...</em></p>
+    }
+    else
+    {
+        <table class="table table-dark">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Descripción</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var marca in marcas)
+                {
+                    <tr>
+                        <td>@marca.Nombre</td>
+                        <td>@marca.Descripcion</td>
+                        <td>
+                            <button class="btn btn-success me-2" @onclick="() => IrModificar(marca.Id)">Modificar</button>
+                            <button class="btn btn-info me-2" @onclick="() => IrDetalle(marca.Id)">Detalle</button>
+                            <button class="btn btn-danger" @onclick="() => PedirEliminar(marca)">Eliminar</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+</div>
+
+@if (mostrarConfirmacion && marcaAEliminar != null)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.85);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-white border border-secondary p-3">
+                <div class="modal-header border-0 pb-0">
+                    <h4 class="modal-title fw-bold text-danger">⚠️ Confirmar eliminación</h4>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CancelarEliminar"></button>
+                </div>
+                <div class="modal-body py-4 fs-4 text-center">
+                    ¿Estás seguro de que deseas eliminar la marca <strong class="text-info">"@marcaAEliminar.Nombre"</strong>?
+                </div>
+                <div class="modal-footer border-0 d-flex justify-content-center gap-3">
+                    <button type="button" class="btn btn-danger fw-bold px-4 py-2 fs-5" @onclick="ConfirmarEliminar">Sí, eliminar</button>
+                    <button type="button" class="btn btn-secondary fw-bold px-4 py-2 fs-5" @onclick="CancelarEliminar">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<MarcaSalidaDTO>? marcas;
+    private string? errorMessage;
+    private bool mostrarConfirmacion;
+    private MarcaSalidaDTO? marcaAEliminar;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        if (!await AuthService.IsAuthenticated())
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        try
+        {
+            marcas = await MarcaService.ObtenerTodasAsync();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            marcas = new();
+            StateHasChanged();
+        }
+    }
+
+    private void Nueva() => Navigation.NavigateTo("/marca/create");
+    private void IrModificar(int id) => Navigation.NavigateTo($"/marca/edit/{id}");
+    private void IrDetalle(int id) => Navigation.NavigateTo($"/marca/detail/{id}");
+
+    private void PedirEliminar(MarcaSalidaDTO marca)
+    {
+        marcaAEliminar = marca;
+        mostrarConfirmacion = true;
+        errorMessage = null;
+    }
+
+    private void CancelarEliminar()
+    {
+        marcaAEliminar = null;
+        mostrarConfirmacion = false;
+    }
+
+    private async Task ConfirmarEliminar()
+    {
+        if (marcaAEliminar == null)
+            return;
+
+        var resultado = await MarcaService.EliminarAsync(marcaAEliminar.Id);
+        if (resultado.Ok)
+        {
+            marcas = await MarcaService.ObtenerTodasAsync();
+            CancelarEliminar();
+            return;
+        }
+
+        errorMessage = resultado.Mensaje;
+        CancelarEliminar();
+    }
+}

@@ -58,3 +58,35 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+.campo-clave {
+    position: relative;
+}
+
+.campo-clave .form-control {
+    padding-right: 2.6rem;
+}
+
+.campo-clave .ojo-clave {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    color: #6c757d;
+    padding: 0;
+    cursor: pointer;
+}
+
+.campo-clave .ojo-clave:focus,
+.campo-clave .ojo-clave:hover {
+    outline: none;
+    box-shadow: none;
+    color: #333;
+    background: transparent;
+}

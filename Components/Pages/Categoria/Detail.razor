@@ -1,0 +1,49 @@
+@page "/categoria/detail/{pId:int}"
+@rendermode InteractiveServer
+@inject CategoriaService CategoriaService
+@inject NavigationManager Navigation
+
+<PageTitle>Detalle de categoría</PageTitle>
+
+<div class="container my-5 text-white">
+    <h3 class="mb-4">Detalle Categoría</h3>
+
+    <EditForm Model="categoriaModificar" OnValidSubmit="IrModificar">
+        <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            <InputText class="form-control" readonly="readonly" @bind-Value="categoriaModificar.Nombre" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Descripción</label>
+            <InputText class="form-control" readonly="readonly" @bind-Value="categoriaModificar.Descripcion" />
+        </div>
+
+        <button type="submit" class="btn btn-info">Ir a Modificar</button>
+        <button type="button" class="btn btn-dark" @onclick="Index">Regresar</button>
+    </EditForm>
+</div>
+
+@code {
+    [Parameter]
+    public int pId { get; set; }
+
+    private CategoriaModificarDTO categoriaModificar = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var categoria = await CategoriaService.ObtenerPorIdAsync(pId);
+        if (categoria == null)
+            return;
+
+        categoriaModificar.Id = categoria.Id;
+        categoriaModificar.Nombre = categoria.Nombre;
+        categoriaModificar.Descripcion = categoria.Descripcion ?? string.Empty;
+        StateHasChanged();
+    }
+
+    private void IrModificar() => Navigation.NavigateTo($"/categoria/edit/{categoriaModificar.Id}");
+    private void Index() => Navigation.NavigateTo("/categoria/index");
+}

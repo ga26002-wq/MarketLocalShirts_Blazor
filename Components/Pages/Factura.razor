@@ -1,0 +1,358 @@
+@page "/factura/{Id:int}"
+@rendermode InteractiveServer
+@inject PedidoService PedidoService
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Factura - MarketLocalShirts</PageTitle>
+
+<div class="factura-fondo">
+    @if (pedido == null && string.IsNullOrEmpty(mensaje))
+    {
+        <div class="text-center text-white py-5">
+            <div class="spinner-border text-info" role="status"></div>
+            <p class="mt-3">Cargando factura...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(mensaje))
+    {
+        <div class="text-center text-white py-5">
+            <p class="fs-5">@mensaje</p>
+            <button class="btn fw-bold py-2 px-4 text-dark" style="background-color: #00a8ff; border: none;" @onclick="Volver">
+                @(pedirLogin ? "Iniciar sesión" : "Volver")
+            </button>
+        </div>
+    }
+    else if (pedido != null)
+    {
+        <article class="hoja">
+            <header class="hoja-encabezado">
+                <h1>Factura</h1>
+                <p class="tienda">MARKETLOCALSHIRTS</p>
+            </header>
+
+            <section class="datos-factura">
+                <p><strong>Fecha de factura:</strong> @pedido.Fecha.ToString("dd/MM/yyyy")</p>
+                <p><strong>Número de factura:</strong> @NumeroFactura</p>
+                <p><strong>Estado:</strong> @pedido.EstadoTexto</p>
+            </section>
+
+            <section class="dos-columnas">
+                <div>
+                    <p class="nombre-azul">@(string.IsNullOrWhiteSpace(nombreCliente) ? "Cliente" : nombreCliente)</p>
+                    <p>Correo: @(string.IsNullOrWhiteSpace(correoCliente) ? "—" : correoCliente)</p>
+                    <p>Teléfono: @(string.IsNullOrWhiteSpace(telefonoCliente) ? "—" : telefonoCliente)</p>
+                </div>
+                <div>
+                    <p class="nombre-azul">MarketLocalShirts</p>
+                    <p>Tienda en línea de camisas</p>
+                    <p>Pedido #@pedido.Id</p>
+                </div>
+            </section>
+
+            <table class="tabla-factura">
+                <thead>
+                    <tr>
+                        <th>Descripción</th>
+                        <th class="text-center">Unidades</th>
+                        <th class="text-end">Precio unitario</th>
+                        <th class="text-end">Precio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var detalle in pedido.Detalles ?? new List<DetallePedidoSalidaDTO>())
+                    {
+                        <tr>
+                            <td>
+                                @detalle.NombreProducto
+                                @if (!string.IsNullOrWhiteSpace(detalle.Talla))
+                                {
+                                    <span> · Talla @detalle.Talla</span>
+                                }
+                            </td>
+                            <td class="text-center">@detalle.Cantidad</td>
+                            <td class="text-end">$@detalle.PrecioUnitario.ToString("F2")</td>
+                            <td class="text-end">$@detalle.SubTotal.ToString("F2")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <div class="totales">
+                <div class="fila-total">
+                    <span>BASE IMPONIBLE:</span>
+                    <span>$@pedido.Subtotal.ToString("F2")</span>
+                </div>
+                <div class="fila-total">
+                    <span>IVA (@PorcentajeIva %):</span>
+                    <span>$@pedido.Iva.ToString("F2")</span>
+                </div>
+                <div class="fila-total fila-pagar">
+                    <span>TOTAL:</span>
+                    <span>$@pedido.Total.ToString("F2")</span>
+                </div>
+            </div>
+
+            <footer class="pie">
+                <p class="nombre-azul">Comentarios:</p>
+                <p>Pedido pagado. Gracias por su compra.</p>
+            </footer>
+        </article>
+
+        <div class="acciones no-imprimir">
+            <button class="btn fw-bold py-2 px-4 text-white" style="background-color: #2f6bff; border: none;" @onclick="Descargar">
+                Descargar factura
+            </button>
+            <button class="btn btn-light fw-bold py-2 px-4" @onclick="Volver">Volver a mis pedidos</button>
+        </div>
+    }
+</div>
+
+<style>
+    .factura-fondo {
+        background: #000;
+        min-height: 100vh;
+        padding: 2.5rem 1rem 3rem;
+    }
+
+    .hoja {
+        max-width: 820px;
+        margin: 0 auto;
+        background: #fff;
+        color: #1a1a1a;
+        border-radius: 4px;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+        overflow: hidden;
+    }
+
+    .hoja-encabezado,
+    .datos-factura,
+    .dos-columnas,
+    .tabla-factura,
+    .totales,
+    .pie {
+        margin-left: 2.2rem;
+        margin-right: 2.2rem;
+    }
+
+    .hoja-encabezado {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding-top: 2rem;
+    }
+
+    .hoja h1,
+    .tienda,
+    .nombre-azul {
+        color: #2f6bff;
+        font-weight: 700;
+    }
+
+    .hoja h1 {
+        margin: 0;
+        font-size: 2.4rem;
+    }
+
+    .tienda {
+        margin: 0.35rem 0 0;
+        font-size: 1.45rem;
+        letter-spacing: 0.04em;
+    }
+
+    .datos-factura {
+        margin-top: 1.4rem;
+    }
+
+    .datos-factura p,
+    .dos-columnas p,
+    .pie p {
+        margin: 0.15rem 0;
+        color: #222;
+    }
+
+    .dos-columnas {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        margin-top: 1.6rem;
+        margin-bottom: 1.6rem;
+    }
+
+    .nombre-azul {
+        font-size: 1.05rem;
+        margin-bottom: 0.45rem !important;
+    }
+
+    .tabla-factura {
+        width: calc(100% - 4.4rem);
+        border-collapse: collapse;
+        margin-bottom: 1.4rem;
+    }
+
+    .tabla-factura th {
+        color: #2f6bff;
+        font-weight: 700;
+        padding: 0.45rem 0.3rem 0.55rem;
+        border-bottom: 2px solid #d9d9d9;
+    }
+
+    .tabla-factura td {
+        padding: 0.7rem 0.3rem;
+        border-bottom: 1px solid #ececec;
+        color: #222;
+    }
+
+    .totales {
+        width: 340px;
+        margin-left: auto;
+        margin-right: 2.2rem;
+        margin-bottom: 2rem;
+    }
+
+    .fila-total {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.2rem 0;
+        color: #2f6bff;
+        font-weight: 700;
+    }
+
+    .fila-total span:last-child {
+        color: #222;
+        font-weight: 500;
+        min-width: 90px;
+        text-align: right;
+    }
+
+    .fila-pagar {
+        margin-top: 0.35rem;
+        font-size: 1.15rem;
+    }
+
+    .fila-pagar span:last-child {
+        color: #2f6bff;
+        font-weight: 800;
+        font-size: 1.35rem;
+    }
+
+    .pie {
+        padding-bottom: 2rem;
+    }
+
+    .acciones {
+        max-width: 820px;
+        margin: 1.25rem auto 0;
+        display: flex;
+        gap: 0.75rem;
+    }
+
+    @@media print {
+        .factura-fondo {
+            background: #fff;
+            padding: 0;
+        }
+
+        .no-imprimir,
+        nav {
+            display: none !important;
+        }
+
+        .hoja {
+            box-shadow: none;
+            max-width: none;
+        }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private PedidoSalidaDTO? pedido;
+    private string nombreCliente = string.Empty;
+    private string correoCliente = string.Empty;
+    private string telefonoCliente = string.Empty;
+    private string mensaje = string.Empty;
+    private bool pedirLogin;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        await CargarFactura();
+        StateHasChanged();
+    }
+
+    private async Task CargarFactura()
+    {
+        mensaje = string.Empty;
+        pedirLogin = false;
+
+        try
+        {
+            if (!await AuthService.IsAuthenticated())
+            {
+                pedirLogin = true;
+                mensaje = "Inicia sesión para ver la factura.";
+                return;
+            }
+
+            var perfil = await AuthService.ObtenerPerfilAsync();
+            if (perfil == null)
+            {
+                pedirLogin = true;
+                mensaje = "Inicia sesión con una cuenta de cliente para ver la factura.";
+                return;
+            }
+
+            nombreCliente = perfil.Nombre;
+            correoCliente = perfil.Correo;
+            telefonoCliente = perfil.Telefono;
+            var pedidos = await PedidoService.ObtenerPorUsuarioAsync(perfil.Id);
+            pedido = pedidos.FirstOrDefault(item => item.Id == Id);
+            if (pedido == null)
+                mensaje = "No encontramos ese pedido en tu cuenta.";
+        }
+        catch (Exception ex)
+        {
+            mensaje = string.IsNullOrWhiteSpace(ex.Message)
+                ? "No se pudo cargar la factura."
+                : ex.Message;
+        }
+    }
+
+    private string NumeroFactura => pedido == null ? string.Empty : $"{pedido.Fecha:yyyy}-{pedido.Id:D4}";
+
+    private string PorcentajeIva =>
+        pedido == null || pedido.Subtotal <= 0
+            ? "13"
+            : Math.Round(pedido.Iva / pedido.Subtotal * 100m, 0).ToString("0");
+
+    private async Task Descargar()
+    {
+        if (pedido == null)
+            return;
+
+        try
+        {
+            var pdf = FacturaPdf.Crear(pedido, nombreCliente, correoCliente, telefonoCliente);
+            var nombre = $"Factura-{NumeroFactura}.pdf";
+            await JS.InvokeVoidAsync("descargarArchivo", nombre, Convert.ToBase64String(pdf), "application/pdf");
+        }
+        catch (Exception ex)
+        {
+            mensaje = string.IsNullOrWhiteSpace(ex.Message)
+                ? "No se pudo descargar la factura."
+                : ex.Message;
+        }
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo(pedirLogin ? "/login" : "/mis-pedidos");
+    }
+}

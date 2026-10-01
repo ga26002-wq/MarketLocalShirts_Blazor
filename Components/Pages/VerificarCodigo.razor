@@ -1,0 +1,62 @@
+@page "/verificar-codigo"
+@rendermode InteractiveServer
+@inject AuthService AuthService
+@inject RecuperacionEstado RecuperacionEstado
+@inject NavigationManager Navigation
+@using System.ComponentModel.DataAnnotations
+
+<PageTitle>Código - MarketLocalShirts</PageTitle>
+
+<div class="d-flex align-items-center justify-content-center bg-black text-white px-3 py-5" style="min-height: calc(100vh - 60px);">
+    <div class="card text-white p-4 shadow-lg border-0 rounded-3" style="max-width: 420px; width: 100%; background-color: #2b2b2b !important;">
+        <h2 class="fw-bold fs-4 mb-2 text-center">Código del correo</h2>
+        <p class="text-light small text-center mb-4">Revisa Gmail y escribe el código de 6 dígitos.</p>
+
+        @if (!string.IsNullOrEmpty(mensaje))
+        {
+            <div class="alert alert-danger py-2 text-center small">@mensaje</div>
+        }
+
+        <label class="form-label fw-bold small">Código</label>
+        <input type="text" maxlength="6" class="form-control bg-light text-dark rounded-2 mb-1 text-center fs-4 @(errores.ContainsKey("Codigo") ? "border border-danger" : "border-0")" @bind="codigo" placeholder="000000" />
+        @if (errores.TryGetValue("Codigo", out var errorCodigo))
+        {
+            <div class="text-danger small fw-bold mb-3">@errorCodigo</div>
+        }
+
+        <button class="btn w-100 fw-bold text-white rounded-2 mt-2" style="background-color: #00a8ff; border: none;" @onclick="Aceptar">
+            Aceptar
+        </button>
+    </div>
+</div>
+
+@code {
+    private string codigo = string.Empty;
+    private string mensaje = string.Empty;
+    private Dictionary<string, string> errores = new();
+
+    private async Task Aceptar()
+    {
+        mensaje = string.Empty;
+        var solicitud = new VerificarCodigoDTO
+        {
+            Correo = RecuperacionEstado.Correo,
+            Codigo = codigo?.Trim() ?? string.Empty
+        };
+        errores = ValidacionFormulario.Errores(solicitud);
+        if (errores.Count > 0)
+            return;
+
+        var resultado = await AuthService.VerificarCodigoAsync(solicitud.Correo, solicitud.Codigo);
+        if (!resultado.Ok || string.IsNullOrWhiteSpace(resultado.Token))
+        {
+            mensaje = string.IsNullOrWhiteSpace(resultado.Mensaje)
+                ? "El código no es válido o ya expiró."
+                : resultado.Mensaje;
+            return;
+        }
+
+        RecuperacionEstado.Token = resultado.Token;
+        Navigation.NavigateTo("/cambiar-contrasena");
+    }
+}

@@ -1,12 +1,7 @@
-﻿@page "/admin/marcas"
-@using MarketLocalShirts.Models
-@using MarketLocalShirts.Service.Auth
-@using System.Text.Json
-@using System.Text.Json.Serialization
-@inject HttpClient Http
+@page "/admin/marcas"
+@inject MarcaService MarcaService
 @inject AuthService AuthService
 @inject NavigationManager Navigation
-@inject IJSRuntime JS
 
 <PageTitle>Administración de Marcas - MarketLocalShirts</PageTitle>
 
@@ -93,17 +88,25 @@
                 <div class="mb-4">
                     <label class="form-label fw-bold fs-3">Nombre de la Marca</label>
                     <input type="text" 
-                           class="form-control bg-secondary text-white border-0 fs-4 p-3" 
+                           class="form-control bg-secondary text-white fs-4 p-3 @(errores.ContainsKey("Nombre") ? "border border-danger" : "border-0")" 
                            @bind="marcaEdicion.Nombre" 
                            placeholder="Ej: Adidas, Nike, Puma..." />
+                    @if (errores.TryGetValue("Nombre", out var errorNombre))
+                    {
+                        <div class="text-danger fw-bold mt-1">@errorNombre</div>
+                    }
                 </div>
 
                 <div class="mb-4">
                     <label class="form-label fw-bold fs-3">Descripción (Opcional)</label>
-                    <textarea class="form-control bg-secondary text-white border-0 fs-4 p-3" 
+                    <textarea class="form-control bg-secondary text-white fs-4 p-3 @(errores.ContainsKey("Descripcion") ? "border border-danger" : "border-0")" 
                               rows="3" 
                               @bind="marcaEdicion.Descripcion" 
                               placeholder="Descripción breve de la marca"></textarea>
+                    @if (errores.TryGetValue("Descripcion", out var errorDescripcion))
+                    {
+                        <div class="text-danger fw-bold mt-1">@errorDescripcion</div>
+                    }
                 </div>
             </div>
         </div>
@@ -167,44 +170,30 @@
 }
 
 @code {
-    private List<MarcaDTO> marcas = new();
+    private List<MarcaSalidaDTO> marcas = new();
     private string mensaje = string.Empty;
+    private Dictionary<string, string> errores = new();
     private bool cargando = true;
     private bool mostrarFormulario = false;
 
     private bool mostrarModalConfirmacion = false;
-    private MarcaDTO? marcaAEliminar = null;
+    private MarcaSalidaDTO? marcaAEliminar = null;
 
-    private MarcaDTO marcaEdicion = new();
-    private const string ApiBaseUrl = "http://localhost:8080/api/marcas";
-
-    protected override async Task OnInitializedAsync()
-    {
-        await CargarMarcasDesdeApi();
-    }
+    private MarcaSalidaDTO marcaEdicion = new();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            try
-            {
-                var token = await JS.InvokeAsync<string>("localStorage.getItem", "authToken");
-                if (string.IsNullOrWhiteSpace(token))
-                {
-                    token = await JS.InvokeAsync<string>("localStorage.getItem", "token");
-                }
+        if (!firstRender)
+            return;
 
-                if (string.IsNullOrWhiteSpace(token))
-                {
-                    Navigation.NavigateTo("/login");
-                }
-            }
-            catch
-            {
-                Navigation.NavigateTo("/login");
-            }
+        if (!await AuthService.IsAuthenticated())
+        {
+            Navigation.NavigateTo("/login");
+            return;
         }
+
+        await CargarMarcasDesdeApi();
+        StateHasChanged();
     }
 
     private async Task CargarMarcasDesdeApi()
@@ -212,27 +201,11 @@
         cargando = true;
         try
         {
-            await AuthService.GetToken();
-            var jsonString = await Http.GetStringAsync(ApiBaseUrl);
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-
-            if (!string.IsNullOrWhiteSpace(jsonString))
-            {
-                if (jsonString.TrimStart().StartsWith("["))
-                {
-                    var lista = JsonSerializer.Deserialize<List<MarcaDTO>>(jsonString, options);
-                    if (lista != null) marcas = lista;
-                }
-                else
-                {
-                    var wrapper = JsonSerializer.Deserialize<PageResponseWrapper>(jsonString, options);
-                    if (wrapper?.Content != null) marcas = wrapper.Content;
-                }
-            }
+            marcas = await MarcaService.ObtenerTodasAsync();
         }
         catch (Exception ex)
         {
-            mensaje = $"Nota al cargar marcas: {ex.Message}";
+            mensaje = ex.Message;
         }
         finally
         {
@@ -242,14 +215,14 @@
 
     private void AbrirFormularioNueva()
     {
-        marcaEdicion = new MarcaDTO();
+        marcaEdicion = new MarcaSalidaDTO();
         mostrarFormulario = true;
         mensaje = string.Empty;
     }
 
-    private void AbrirFormularioEditar(MarcaDTO m)
+    private void AbrirFormularioEditar(MarcaSalidaDTO m)
     {
-        marcaEdicion = new MarcaDTO
+        marcaEdicion = new MarcaSalidaDTO
         {
             Id = m.Id,
             Nombre = m.Nombre,
@@ -269,35 +242,25 @@
     {
         try
         {
-            await AuthService.GetToken();
-
-            if (string.IsNullOrWhiteSpace(marcaEdicion.Nombre))
+            var datos = new MarcaGuardarDTO
             {
-                mensaje = "Por favor ingresa el nombre de la marca.";
+                Nombre = marcaEdicion.Nombre,
+                Descripcion = marcaEdicion.Descripcion ?? string.Empty
+            };
+            errores = ValidacionFormulario.Errores(datos);
+            if (errores.Count > 0)
+            {
+                mensaje = "Revisa los campos marcados en rojo.";
                 return;
             }
 
-            HttpResponseMessage response;
+            var resultado = await MarcaService.GuardarAsync(datos, marcaEdicion.Id);
 
-            if (marcaEdicion.Id == 0)
+            mensaje = resultado.Mensaje;
+            if (resultado.Ok)
             {
-                response = await Http.PostAsJsonAsync(ApiBaseUrl, marcaEdicion);
-            }
-            else
-            {
-                response = await Http.PutAsJsonAsync($"{ApiBaseUrl}/{marcaEdicion.Id}", marcaEdicion);
-            }
-
-            if (response.IsSuccessStatusCode)
-            {
-                mensaje = "¡Marca guardada exitosamente!";
                 mostrarFormulario = false;
                 await CargarMarcasDesdeApi();
-            }
-            else
-            {
-                var errorBody = await response.Content.ReadAsStringAsync();
-                mensaje = $"Error de API ({(int)response.StatusCode}): {errorBody}";
             }
         }
         catch (Exception ex)
@@ -306,7 +269,7 @@
         }
     }
 
-    private void SolicitarConfirmacionEliminar(MarcaDTO marca)
+    private void SolicitarConfirmacionEliminar(MarcaSalidaDTO marca)
     {
         marcaAEliminar = marca;
         mostrarModalConfirmacion = true;
@@ -324,18 +287,15 @@
 
         try
         {
-            await AuthService.GetToken();
-            var response = await Http.DeleteAsync($"{ApiBaseUrl}/{marcaAEliminar.Id}");
-
-            if (response.IsSuccessStatusCode)
+            var resultado = await MarcaService.EliminarAsync(marcaAEliminar.Id);
+            if (resultado.Ok)
             {
-                mensaje = $"La marca '{marcaAEliminar.Nombre}' fue eliminada con éxito.";
+                mensaje = $"La marca '{marcaAEliminar.Nombre}' fue eliminada.";
                 marcas.RemoveAll(m => m.Id == marcaAEliminar.Id);
             }
             else
             {
-                var errorBody = await response.Content.ReadAsStringAsync();
-                mensaje = $"Error de API ({(int)response.StatusCode}): {errorBody}";
+                mensaje = resultado.Mensaje;
             }
         }
         catch (Exception ex)
@@ -350,9 +310,4 @@
         }
     }
 
-    public class PageResponseWrapper
-    {
-        [JsonPropertyName("content")]
-        public List<MarcaDTO>? Content { get; set; }
-    }
 }

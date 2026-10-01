@@ -1,0 +1,49 @@
+@page "/marca/detail/{pId:int}"
+@rendermode InteractiveServer
+@inject MarcaService MarcaService
+@inject NavigationManager Navigation
+
+<PageTitle>Detalle de marca</PageTitle>
+
+<div class="container my-5 text-white">
+    <h3 class="mb-4">Detalle Marca</h3>
+
+    <EditForm Model="marcaModificar" OnValidSubmit="IrModificar">
+        <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            <InputText class="form-control" readonly="readonly" @bind-Value="marcaModificar.Nombre" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Descripción</label>
+            <InputText class="form-control" readonly="readonly" @bind-Value="marcaModificar.Descripcion" />
+        </div>
+
+        <button type="submit" class="btn btn-info">Ir a Modificar</button>
+        <button type="button" class="btn btn-dark" @onclick="Index">Regresar</button>
+    </EditForm>
+</div>
+
+@code {
+    [Parameter]
+    public int pId { get; set; }
+
+    private MarcaModificarDTO marcaModificar = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var marca = await MarcaService.ObtenerPorIdAsync(pId);
+        if (marca == null)
+            return;
+
+        marcaModificar.Id = marca.Id;
+        marcaModificar.Nombre = marca.Nombre;
+        marcaModificar.Descripcion = marca.Descripcion ?? string.Empty;
+        StateHasChanged();
+    }
+
+    private void IrModificar() => Navigation.NavigateTo($"/marca/edit/{marcaModificar.Id}");
+    private void Index() => Navigation.NavigateTo("/marca/index");
+}

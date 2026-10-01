@@ -1,4 +1,9 @@
 ﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject CamisaService CamisaService
+@inject MarcaService MarcaService
+@inject AuthService AuthService
+@inject PedidoService PedidoService
 
 <div class="main-layout bg-black min-vh-100 text-white d-flex flex-column">
     <!-- Navbar a ancho completo -->
@@ -9,3 +14,63 @@
         @Body
     </main>
 </div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        AuthService.OnChange += AlCambiarSesion;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        _ = PrecargarTienda();
+        _ = PrecargarSesion();
+    }
+
+    private void AlCambiarSesion()
+    {
+        _ = PrecargarSesion();
+    }
+
+    private async Task PrecargarTienda()
+    {
+        try
+        {
+            await Task.WhenAll(CamisaService.ObtenerTodasAsync(), MarcaService.ObtenerTodasAsync());
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task PrecargarSesion()
+    {
+        try
+        {
+            var token = await AuthService.GetToken();
+            if (string.IsNullOrEmpty(token))
+                return;
+
+            if (AuthService.TokenEsAdmin(token))
+            {
+                await PedidoService.ObtenerTodosAsync();
+                return;
+            }
+
+            var perfil = await AuthService.ObtenerPerfilAsync();
+            if (perfil != null)
+                await PedidoService.ObtenerPorUsuarioAsync(perfil.Id);
+        }
+        catch
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        AuthService.OnChange -= AlCambiarSesion;
+    }
+}

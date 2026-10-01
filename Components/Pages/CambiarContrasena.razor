@@ -1,0 +1,86 @@
+@page "/cambiar-contrasena"
+@rendermode InteractiveServer
+@inject AuthService AuthService
+@inject RecuperacionEstado RecuperacionEstado
+@inject NavigationManager Navigation
+@using System.ComponentModel.DataAnnotations
+
+<PageTitle>Cambiar contraseña - MarketLocalShirts</PageTitle>
+
+<div class="d-flex align-items-center justify-content-center bg-black text-white px-3 py-5" style="min-height: calc(100vh - 60px);">
+    <div class="card text-white p-4 shadow-lg border-0 rounded-3" style="max-width: 420px; width: 100%; background-color: #2b2b2b !important;">
+        <h2 class="fw-bold fs-4 mb-3 text-center">Nueva contraseña</h2>
+
+        @if (!string.IsNullOrEmpty(mensaje))
+        {
+            <div class="alert @(exito ? "alert-success" : "alert-danger") py-2 text-center small">@mensaje</div>
+        }
+
+        <label class="form-label fw-bold small">Nueva contraseña</label>
+        <input type="password" class="form-control bg-light text-dark rounded-2 mb-1 @(errores.ContainsKey("NuevaClave") ? "border border-danger" : "border-0")" @bind="nuevaClave" />
+        @if (errores.TryGetValue("NuevaClave", out var errorClave))
+        {
+            <div class="text-danger small fw-bold mb-3">@errorClave</div>
+        }
+
+        <label class="form-label fw-bold small mt-2">Confirmar</label>
+        <input type="password" class="form-control bg-light text-dark rounded-2 mb-1 @(errores.ContainsKey("Confirmar") ? "border border-danger" : "border-0")" @bind="confirmar" />
+        @if (errores.TryGetValue("Confirmar", out var errorConfirmar))
+        {
+            <div class="text-danger small fw-bold mb-3">@errorConfirmar</div>
+        }
+
+        <button class="btn w-100 fw-bold text-white rounded-2 mt-3" style="background-color: #00a8ff; border: none;" @onclick="Guardar">
+            Guardar contraseña
+        </button>
+    </div>
+</div>
+
+@code {
+    private string nuevaClave = string.Empty;
+    private string confirmar = string.Empty;
+    private string mensaje = string.Empty;
+    private bool exito;
+    private Dictionary<string, string> errores = new();
+
+    private async Task Guardar()
+    {
+        mensaje = string.Empty;
+        exito = false;
+        errores = new();
+
+        if (string.IsNullOrWhiteSpace(RecuperacionEstado.Token))
+        {
+            mensaje = "Primero confirma el código del correo.";
+            return;
+        }
+
+        var solicitud = new RestablecerClaveDTO
+        {
+            Token = RecuperacionEstado.Token,
+            NuevaClave = nuevaClave
+        };
+        errores = ValidacionFormulario.Errores(solicitud);
+        errores.Remove("Token");
+        if (string.IsNullOrWhiteSpace(nuevaClave))
+            errores["NuevaClave"] = "La nueva contraseña es obligatoria";
+        else if (nuevaClave.Length < 6)
+            errores["NuevaClave"] = "La nueva contraseña debe tener al menos 6 caracteres";
+
+        if (nuevaClave != confirmar)
+            errores["Confirmar"] = "Las contraseñas no coinciden.";
+
+        if (errores.Count > 0)
+            return;
+
+        var resultado = await AuthService.RestablecerClaveAsync(solicitud.Token, solicitud.NuevaClave);
+        exito = resultado.Ok;
+        mensaje = resultado.Mensaje;
+        if (resultado.Ok)
+        {
+            RecuperacionEstado.Token = string.Empty;
+            await Task.Delay(1200);
+            Navigation.NavigateTo("/login");
+        }
+    }
+}

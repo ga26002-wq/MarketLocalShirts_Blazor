@@ -1,10 +1,8 @@
 ﻿@page "/login"
 @rendermode InteractiveServer
-@inject HttpClient Http
 @inject AuthService AuthService
 @inject NavigationManager Navigation
-@inject IJSRuntime JS
-@using MarketLocalShirts.Service.Auth
+@using System.ComponentModel.DataAnnotations
 @using System.Text.Json.Serialization
 
 <PageTitle>Iniciar Sesión - MarketLocalShirts</PageTitle>
@@ -23,12 +21,25 @@
 
         <div class="form-group mb-3">
             <label class="form-label fw-bold mb-1 small">Correo Electrónico</label>
-            <input type="text" class="form-control bg-light text-dark border-0 rounded-2" @bind="loginModel.Login" placeholder="tucorreo@email.com" />
+            <input type="text" class="form-control bg-light text-dark rounded-2 @(errores.ContainsKey("Login") ? "border border-danger" : "border-0")" @bind="loginModel.Login" placeholder="tucorreo@email.com" />
+            @if (errores.TryGetValue("Login", out var errorCorreo))
+            {
+                <div class="text-danger small fw-bold mt-1">@errorCorreo</div>
+            }
         </div>
 
         <div class="form-group mb-4">
             <label class="form-label fw-bold mb-1 small">Contraseña</label>
-            <input type="password" class="form-control bg-light text-dark border-0 rounded-2" @bind="loginModel.Clave" placeholder="••••••••" />
+            <div class="campo-clave">
+                <input type="@(verClave ? "text" : "password")" class="form-control bg-light text-dark rounded-2 @(errores.ContainsKey("Clave") ? "border border-danger" : "border-0")" @bind="loginModel.Clave" placeholder="••••••••" />
+                <button type="button" class="ojo-clave" @onclick="() => verClave = !verClave" title="@(verClave ? "Ocultar" : "Ver")">
+                    <i class="bi @(verClave ? "bi-eye-slash" : "bi-eye")"></i>
+                </button>
+            </div>
+            @if (errores.TryGetValue("Clave", out var errorClave))
+            {
+                <div class="text-danger small fw-bold mt-1">@errorClave</div>
+            }
         </div>
 
         <button type="button" class="btn btn-info w-100 fw-bold text-white mb-3 rounded-2" style="background-color: #00a8ff; border: none; padding: 0.6rem;" @onclick="HandleLogin">
@@ -50,70 +61,29 @@
 @code {
     private LoginModel loginModel = new();
     private string? errorMessage;
+    private bool verClave;
+    private Dictionary<string, string> errores = new();
 
     private async Task HandleLogin()
     {
         errorMessage = null;
+        errores = ValidacionFormulario.Errores(loginModel);
+        if (errores.Count > 0)
+            return;
+
         try
         {
-            var response = await Http.PostAsJsonAsync("http://localhost:8080/api/auth/login", loginModel);
-
-            if (response.IsSuccessStatusCode)
+            var resultado = await AuthService.LoginAsync(loginModel.Login, loginModel.Clave);
+            if (!resultado.Ok || string.IsNullOrEmpty(resultado.Token))
             {
-                var resultado = await response.Content.ReadFromJsonAsync<TokenResponseDto>();
-                if (resultado != null && !string.IsNullOrEmpty(resultado.Token))
-                {
-                    // 1. Guardar token en el AuthService y localStorage
-                    await AuthService.SetToken(resultado.Token);
-                    await JS.InvokeVoidAsync("localStorage.setItem", "authToken", resultado.Token);
-                    await JS.InvokeVoidAsync("localStorage.setItem", "userEmail", loginModel.Login);
-
-                    // 2. Determinar si es Admin por correo o decodificando el Token JWT
-                    bool esAdmin = EsAdmin(resultado.Token, loginModel.Login);
-
-                    // 3. Consulta de respaldo a la API en tiempo real
-                    if (!esAdmin)
-                    {
-                        try
-                        {
-                            using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost:8080/api/usuarios/perfil");
-                            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", resultado.Token);
-                            var responsePerfil = await Http.SendAsync(request);
-
-                            if (responsePerfil.IsSuccessStatusCode)
-                            {
-                                var jsonRaw = await responsePerfil.Content.ReadAsStringAsync();
-                                string upperJson = jsonRaw.ToUpper();
-
-                                if (upperJson.Contains("\"IDROL\":1") || upperJson.Contains("\"ROLID\":1") ||
-                                    upperJson.Contains("\"ID_ROL\":1") || upperJson.Contains("ADMIN") ||
-                                    upperJson.Contains("ROLE_ADMIN"))
-                                {
-                                    esAdmin = true;
-                                }
-                            }
-                        }
-                        catch { }
-                    }
-
-                    // 4. Redirección correspondiente
-                    if (esAdmin)
-                    {
-                        await JS.InvokeVoidAsync("localStorage.setItem", "userRole", "ADMIN");
-                        Navigation.NavigateTo("/admin/usuarios", forceLoad: true);
-                    }
-                    else
-                    {
-                        await JS.InvokeVoidAsync("localStorage.setItem", "userRole", "CLIENTE");
-                        Navigation.NavigateTo("/", forceLoad: true);
-                    }
-                }
+                errorMessage = resultado.Mensaje;
+                return;
             }
+
+            if (AuthService.TokenEsAdmin(resultado.Token))
+                Navigation.NavigateTo("/admin/usuarios");
             else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                errorMessage = $"Error {(int)response.StatusCode}: {errorContent}";
-            }
+                Navigation.NavigateTo("/");
         }
         catch (Exception ex)
         {
@@ -121,50 +91,16 @@
         }
     }
 
-    private static bool EsAdmin(string token, string email)
-    {
-        if (!string.IsNullOrEmpty(email) && email.Equals("Admin@gmail.com", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        try
-        {
-            var parts = token.Split('.');
-            if (parts.Length >= 2)
-            {
-                string payloadBase64 = parts[1];
-                payloadBase64 = payloadBase64.Replace('-', '+').Replace('_', '/');
-                switch (payloadBase64.Length % 4)
-                {
-                    case 2: payloadBase64 += "=="; break;
-                    case 3: payloadBase64 += "="; break;
-                }
-                byte[] bytes = Convert.FromBase64String(payloadBase64);
-                string jsonPayload = System.Text.Encoding.UTF8.GetString(bytes).ToUpper();
-
-                return jsonPayload.Contains("ADMIN") ||
-                       jsonPayload.Contains("ROLE_ADMIN") ||
-                       jsonPayload.Contains("\"IDROL\":1") ||
-                       jsonPayload.Contains("\"ROL\":1") ||
-                       jsonPayload.Contains("\"ID_ROL\":1");
-            }
-        }
-        catch { }
-
-        return false;
-    }
-
     public class LoginModel
     {
+        [Required(ErrorMessage = "El correo es obligatorio")]
+        [EmailAddress(ErrorMessage = "Debes escribir un correo válido, por ejemplo nombre@correo.com")]
         [JsonPropertyName("login")]
         public string Login { get; set; } = string.Empty;
 
+        [Required(ErrorMessage = "La contraseña es obligatoria")]
         [JsonPropertyName("clave")]
         public string Clave { get; set; } = string.Empty;
     }
 
-    public class TokenResponseDto
-    {
-        [JsonPropertyName("token")]
-        public string Token { get; set; } = string.Empty;
-    }
 }

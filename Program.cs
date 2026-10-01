@@ -1,25 +1,22 @@
 using MarketLocalShirts.Components;
-using MarketLocalShirts.Service.Auth;
-using MarketLocalShirts.Service.Carrito;
-using MarketLocalShirts.Service.Categoria;
-using MarketLocalShirts.Service.Pedido;
+using MarketLocalShirts.Service;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Registrar Servicios de la aplicación
 builder.Services.AddScoped<AuthService>();
-builder.Services.AddScoped<CarritoService>();
+builder.Services.AddScoped<CamisaService>();
+builder.Services.AddScoped<MarcaService>();
 builder.Services.AddScoped<CategoriaService>();
 builder.Services.AddScoped<PedidoService>();
+builder.Services.AddScoped<CarritoService>();
+builder.Services.AddScoped<UsuarioService>();
+builder.Services.AddScoped<RecuperacionEstado>();
 
-builder.Services.AddServerSideBlazor();
-
-// Configurar HttpClient apuntando a tu API Spring Boot
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri("http://localhost:8080/") });
+var apiBase = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:8080/";
+builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(apiBase) });
 
 var app = builder.Build();
 

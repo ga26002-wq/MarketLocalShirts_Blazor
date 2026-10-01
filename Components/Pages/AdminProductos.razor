@@ -1,12 +1,9 @@
-﻿@page "/admin/productos"
-@using MarketLocalShirts.Models
-@using MarketLocalShirts.Service.Auth
-@using System.Text.Json
-@using System.Text.Json.Serialization
-@inject HttpClient Http
+@page "/admin/productos"
+@inject CamisaService CamisaService
+@inject MarcaService MarcaService
+@inject CategoriaService CategoriaService
 @inject AuthService AuthService
 @inject NavigationManager Navigation
-@inject IJSRuntime JS
 
 <PageTitle>Administración de Productos - MarketLocalShirts</PageTitle>
 
@@ -138,10 +135,14 @@
                 <div class="w-100">
                     <label class="form-label fw-bold fs-5">URL / Ruta de la Imagen</label>
                     <input type="text" 
-                           class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                           class="form-control bg-secondary text-white fs-5 p-3 @(errores.ContainsKey("ImagenUrl") ? "border border-danger" : "border-0")" 
                            @bind="productoEdicion.ImagenUrl" 
                            @bind:event="oninput"
                            placeholder="/camisa-polo.png" />
+                    @if (errores.TryGetValue("ImagenUrl", out var errorImagen))
+                    {
+                        <div class="text-danger fw-bold mt-1">@errorImagen</div>
+                    }
                 </div>
             </div>
 
@@ -150,23 +151,31 @@
                 <div class="mb-4">
                     <label class="form-label fw-bold fs-4">Nombre</label>
                     <input type="text" 
-                           class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                           class="form-control bg-secondary text-white fs-5 p-3 @(errores.ContainsKey("Nombre") ? "border border-danger" : "border-0")" 
                            @bind="productoEdicion.Nombre" 
                            placeholder="Nombre del producto" />
+                    @if (errores.TryGetValue("Nombre", out var errorNombre))
+                    {
+                        <div class="text-danger fw-bold mt-1">@errorNombre</div>
+                    }
                 </div>
 
                 <div class="mb-4">
                     <label class="form-label fw-bold fs-4">Descripcion</label>
-                    <textarea class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                    <textarea class="form-control bg-secondary text-white fs-5 p-3 @(errores.ContainsKey("Descripcion") ? "border border-danger" : "border-0")" 
                               rows="3" 
                               @bind="productoEdicion.Descripcion" 
                               placeholder="Descripción detallada de la prenda"></textarea>
+                    @if (errores.TryGetValue("Descripcion", out var errorDescripcion))
+                    {
+                        <div class="text-danger fw-bold mt-1">@errorDescripcion</div>
+                    }
                 </div>
 
                 <!-- DESPLEGABLE DINÁMICO DE MARCAS DESDE LA API -->
                 <div class="mb-4">
                     <label class="form-label fw-bold fs-4">Marca</label>
-                    <select class="form-select bg-secondary text-white border-0 fs-5 p-3" @bind="idMarcaSeleccionada">
+                    <select class="form-select bg-secondary text-white fs-5 p-3 @(errores.ContainsKey("MarcaId") ? "border border-danger" : "border-0")" @bind="idMarcaSeleccionada">
                         @if (listaMarcas == null || !listaMarcas.Any())
                         {
                             <option value="0">-- Cargando marcas... --</option>
@@ -179,6 +188,55 @@
                             }
                         }
                     </select>
+                    @if (errores.TryGetValue("MarcaId", out var errorMarca))
+                    {
+                        <div class="text-danger fw-bold mt-1">@errorMarca</div>
+                    }
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold fs-4">Categoría</label>
+                    <select class="form-select bg-secondary text-white fs-5 p-3 @(errores.ContainsKey("CategoriaId") ? "border border-danger" : "border-0")" @bind="idCategoriaSeleccionada">
+                        @if (listaCategorias == null || !listaCategorias.Any())
+                        {
+                            <option value="0">Crea una categoría primero</option>
+                        }
+                        else
+                        {
+                            @foreach (var categoria in listaCategorias)
+                            {
+                                <option value="@categoria.Id">@categoria.Nombre</option>
+                            }
+                        }
+                    </select>
+                    @if (errores.TryGetValue("CategoriaId", out var errorCategoria))
+                    {
+                        <div class="text-danger fw-bold mt-1">@errorCategoria</div>
+                    }
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold fs-4">Talla</label>
+                        <select class="form-select bg-secondary text-white fs-5 p-3 @(errores.ContainsKey("Talla") ? "border border-danger" : "border-0")" @bind="productoEdicion.Talla">
+                            @foreach (var talla in TallasDisponibles)
+                            {
+                                <option value="@talla">@talla</option>
+                            }
+                        </select>
+                        @if (errores.TryGetValue("Talla", out var errorTalla))
+                        {
+                            <div class="text-danger fw-bold mt-1">@errorTalla</div>
+                        }
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold fs-4">Color</label>
+                        <input type="text" class="form-control bg-secondary text-white fs-5 p-3 @(errores.ContainsKey("Color") ? "border border-danger" : "border-0")" @bind="productoEdicion.Color" placeholder="Negro" />
+                        @if (errores.TryGetValue("Color", out var errorColor))
+                        {
+                            <div class="text-danger fw-bold mt-1">@errorColor</div>
+                        }
+                    </div>
                 </div>
 
                 <div class="row mb-4">
@@ -186,14 +244,22 @@
                         <label class="form-label fw-bold fs-4">Precio</label>
                         <input type="number" 
                                step="0.01" 
-                               class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                               class="form-control bg-secondary text-white fs-5 p-3 @(errores.ContainsKey("Precio") ? "border border-danger" : "border-0")" 
                                @bind="productoEdicion.Precio" />
+                        @if (errores.TryGetValue("Precio", out var errorPrecio))
+                        {
+                            <div class="text-danger fw-bold mt-1">@errorPrecio</div>
+                        }
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold fs-4">Stock</label>
                         <input type="number" 
-                               class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                               class="form-control bg-secondary text-white fs-5 p-3 @(errores.ContainsKey("Stock") ? "border border-danger" : "border-0")" 
                                @bind="productoEdicion.Stock" />
+                        @if (errores.TryGetValue("Stock", out var errorStock))
+                        {
+                            <div class="text-danger fw-bold mt-1">@errorStock</div>
+                        }
                     </div>
                 </div>
             </div>
@@ -257,98 +323,81 @@
 }
 
 @code {
-    private List<CamisaDTO> productos = new();
-    private List<MarcaDTO> listaMarcas = new();
+    private List<CamisaSalidaDTO> productos = new();
+    private List<MarcaSalidaDTO> listaMarcas = new();
+    private List<CategoriaSalidaDTO> listaCategorias = new();
     private int idMarcaSeleccionada = 1;
+    private int idCategoriaSeleccionada;
 
     private string criterioBusqueda = string.Empty;
     private string mensaje = string.Empty;
+    private Dictionary<string, string> errores = new();
     private bool cargando = true;
     private bool mostrarFormulario = false;
 
     private bool mostrarModalConfirmacion = false;
-    private CamisaDTO? productoAEliminar = null;
+    private CamisaSalidaDTO? productoAEliminar = null;
 
-    private CamisaDTO productoEdicion = new();
-    private string nombreMarcaInput = string.Empty;
+    private CamisaSalidaDTO productoEdicion = new();
+    private static readonly string[] TallasBase = ["S", "M", "L", "XL", "XXL"];
 
-    private const string ApiBaseUrl = "http://localhost:8080/api/camisas";
-    private const string ApiMarcasUrl = "http://localhost:8080/api/marcas";
-
-    protected override async Task OnInitializedAsync()
+    private IEnumerable<string> TallasDisponibles
     {
-        await CargarProductosDesdeApi();
-        await CargarMarcasDesdeApi();
+        get
+        {
+            var nombres = new List<string>(TallasBase);
+            foreach (var producto in productos)
+            {
+                AgregarTallaLista(nombres, producto.Talla);
+                if (producto.Tallas == null)
+                    continue;
+
+                foreach (var talla in producto.Tallas)
+                    AgregarTallaLista(nombres, talla.Talla);
+            }
+
+            AgregarTallaLista(nombres, productoEdicion.Talla);
+            return nombres;
+        }
+    }
+
+    private static void AgregarTallaLista(List<string> nombres, string? talla)
+    {
+        if (string.IsNullOrWhiteSpace(talla))
+            return;
+
+        var limpia = talla.Trim();
+        if (nombres.Any(n => n.Equals(limpia, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        nombres.Add(limpia);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            try
-            {
-                var token = await JS.InvokeAsync<string>("localStorage.getItem", "authToken");
-                if (string.IsNullOrWhiteSpace(token))
-                {
-                    token = await JS.InvokeAsync<string>("localStorage.getItem", "token");
-                }
+        if (!firstRender)
+            return;
 
-                if (string.IsNullOrWhiteSpace(token))
-                {
-                    Navigation.NavigateTo("/login");
-                }
-            }
-            catch
-            {
-                Navigation.NavigateTo("/login");
-            }
+        if (!await AuthService.IsAuthenticated())
+        {
+            Navigation.NavigateTo("/login");
+            return;
         }
+
+        await CargarProductosDesdeApi();
+        await CargarCatalogos();
+        StateHasChanged();
     }
 
-    private async Task CargarMarcasDesdeApi()
+    private async Task CargarCatalogos()
     {
         try
         {
-            var jsonString = await Http.GetStringAsync(ApiMarcasUrl);
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-
-            if (!string.IsNullOrWhiteSpace(jsonString))
-            {
-                if (jsonString.TrimStart().StartsWith("["))
-                {
-                    var lista = JsonSerializer.Deserialize<List<MarcaDTO>>(jsonString, options);
-                    if (lista != null && lista.Any())
-                    {
-                        listaMarcas = lista;
-                    }
-                }
-                else
-                {
-                    var wrapper = JsonSerializer.Deserialize<PageResponseWrapperMarcas>(jsonString, options);
-                    if (wrapper?.Content != null && wrapper.Content.Any())
-                    {
-                        listaMarcas = wrapper.Content;
-                    }
-                }
-            }
-        }
-        catch { }
-    }
-
-    private async Task<string> ObtenerTokenSesion()
-    {
-        try
-        {
-            var token = await JS.InvokeAsync<string>("localStorage.getItem", "authToken");
-            if (string.IsNullOrWhiteSpace(token))
-            {
-                token = await AuthService.GetToken();
-            }
-            return token ?? string.Empty;
+            listaMarcas = await MarcaService.ObtenerTodasAsync();
+            listaCategorias = await CategoriaService.ObtenerTodasAsync();
         }
         catch
         {
-            return string.Empty;
         }
     }
 
@@ -357,29 +406,11 @@
         cargando = true;
         try
         {
-            var jsonString = await Http.GetStringAsync($"{ApiBaseUrl}/lista");
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-
-            if (!string.IsNullOrWhiteSpace(jsonString))
-            {
-                if (jsonString.TrimStart().StartsWith("["))
-                {
-                    var lista = JsonSerializer.Deserialize<List<CamisaDTO>>(jsonString, options);
-                    if (lista != null) productos = lista;
-                }
-                else
-                {
-                    var wrapper = JsonSerializer.Deserialize<PageResponseWrapper>(jsonString, options);
-                    if (wrapper?.Content != null)
-                    {
-                        productos = wrapper.Content;
-                    }
-                }
-            }
+            productos = await CamisaService.ObtenerTodasAsync();
         }
         catch (Exception ex)
         {
-            mensaje = $"Nota al sincronizar con API: {ex.Message}";
+            mensaje = ex.Message;
         }
         finally
         {
@@ -387,7 +418,7 @@
         }
     }
 
-    private IEnumerable<CamisaDTO> productosFiltrados =>
+    private IEnumerable<CamisaSalidaDTO> productosFiltrados =>
         string.IsNullOrWhiteSpace(criterioBusqueda)
             ? productos
             : productos.Where(p => p.Nombre.Contains(criterioBusqueda, StringComparison.OrdinalIgnoreCase) ||
@@ -397,50 +428,44 @@
 
     private async Task AbrirFormularioNuevo()
     {
-        if (!listaMarcas.Any())
+        if (!listaMarcas.Any() || !listaCategorias.Any())
+            await CargarCatalogos();
+
+        idMarcaSeleccionada = listaMarcas.FirstOrDefault()?.Id ?? 0;
+        idCategoriaSeleccionada = listaCategorias.FirstOrDefault()?.Id ?? 0;
+
+        productoEdicion = new CamisaSalidaDTO
         {
-            await CargarMarcasDesdeApi();
-        }
-
-        idMarcaSeleccionada = listaMarcas.FirstOrDefault()?.Id ?? 1;
-
-        productoEdicion = new CamisaDTO 
-        { 
-            Stock = 10, 
-            Precio = 25.00m, 
-            ImagenUrl = "/camisa-polo.png",
-            Marca = new MarcaDTO { Id = idMarcaSeleccionada, Nombre = listaMarcas.FirstOrDefault()?.Nombre ?? "Adidas" },
-            Categoria = new CategoriaDTO { Id = 1, Nombre = "Camisetas" }
+            Stock = 10,
+            Precio = 25.00m,
+            Talla = "M",
+            Color = "Negro"
         };
-        nombreMarcaInput = listaMarcas.FirstOrDefault()?.Nombre ?? "Adidas";
         mostrarFormulario = true;
         mensaje = string.Empty;
     }
 
-    private async Task AbrirFormularioEditar(CamisaDTO prod)
+    private async Task AbrirFormularioEditar(CamisaSalidaDTO prod)
     {
-        if (!listaMarcas.Any())
-        {
-            await CargarMarcasDesdeApi();
-        }
+        if (!listaMarcas.Any() || !listaCategorias.Any())
+            await CargarCatalogos();
 
-        productoEdicion = new CamisaDTO
+        productoEdicion = new CamisaSalidaDTO
         {
             Id = prod.Id,
             Nombre = prod.Nombre,
             Descripcion = prod.Descripcion,
             Precio = prod.Precio,
             Stock = prod.Stock,
-            Agotado = prod.Agotado,
             ImagenUrl = prod.ImagenUrl,
-            Talla = prod.Talla,
+            Talla = string.IsNullOrWhiteSpace(prod.Talla) ? "M" : prod.Talla,
             Color = prod.Color,
-            Marca = prod.Marca != null ? new MarcaDTO { Id = prod.Marca.Id, Nombre = prod.Marca.Nombre } : new MarcaDTO { Id = 1, Nombre = "MLS" },
-            Categoria = prod.Categoria != null ? new CategoriaDTO { Id = prod.Categoria.Id, Nombre = prod.Categoria.Nombre } : new CategoriaDTO { Id = 1, Nombre = "Camisetas" }
+            Tallas = prod.Tallas
         };
+        CargarTallasGuardadas(prod);
 
-        idMarcaSeleccionada = prod.Marca?.Id ?? 1;
-        nombreMarcaInput = prod.Marca?.Nombre ?? "Adidas";
+        idMarcaSeleccionada = prod.Marca?.Id ?? listaMarcas.FirstOrDefault()?.Id ?? 0;
+        idCategoriaSeleccionada = prod.Categoria?.Id ?? listaCategorias.FirstOrDefault()?.Id ?? 0;
         mostrarFormulario = true;
         mensaje = string.Empty;
     }
@@ -451,59 +476,54 @@
         mensaje = string.Empty;
     }
 
+    private void CargarTallasGuardadas(CamisaSalidaDTO prod)
+    {
+        var guardada = prod.Tallas?.FirstOrDefault(t => !string.IsNullOrWhiteSpace(t.Talla));
+        if (guardada == null)
+            return;
+
+        productoEdicion.Talla = guardada.Talla;
+        productoEdicion.Stock = guardada.Stock;
+    }
+
     private async Task GuardarProducto()
     {
         try
         {
-            var token = await ObtenerTokenSesion();
-            var payload = new
+            var datos = new CamisaGuardarDTO
             {
-                id = productoEdicion.Id,
-                nombre = string.IsNullOrWhiteSpace(productoEdicion.Nombre) ? "Camisa MLS" : productoEdicion.Nombre,
-                descripcion = string.IsNullOrWhiteSpace(productoEdicion.Descripcion) ? "Sin descripción" : productoEdicion.Descripcion,
-                precio = productoEdicion.Precio,
-                stock = productoEdicion.Stock,
-                agotado = productoEdicion.Stock <= 0,
-                imagenUrl = string.IsNullOrWhiteSpace(productoEdicion.ImagenUrl) ? "/camisa-polo.png" : productoEdicion.ImagenUrl,
-                talla = "M",
-                color = "Negro",
-                marcaId = idMarcaSeleccionada > 0 ? idMarcaSeleccionada : (productoEdicion.Marca?.Id > 0 ? productoEdicion.Marca.Id : 1),
-                categoriaId = productoEdicion.Categoria?.Id > 0 ? productoEdicion.Categoria.Id : 1
+                Nombre = productoEdicion.Nombre,
+                Descripcion = productoEdicion.Descripcion,
+                Precio = productoEdicion.Precio,
+                Stock = productoEdicion.Stock,
+                ImagenUrl = productoEdicion.ImagenUrl,
+                Talla = productoEdicion.Talla ?? string.Empty,
+                Color = productoEdicion.Color,
+                MarcaId = idMarcaSeleccionada,
+                CategoriaId = idCategoriaSeleccionada
             };
-
-            var url = productoEdicion.Id == 0 ? ApiBaseUrl : $"{ApiBaseUrl}/{productoEdicion.Id}";
-            var method = productoEdicion.Id == 0 ? HttpMethod.Post : HttpMethod.Put;
-
-            using var request = new HttpRequestMessage(method, url);
-            if (!string.IsNullOrWhiteSpace(token))
+            errores = ValidacionFormulario.Errores(datos);
+            if (errores.Count > 0)
             {
-                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                mensaje = "Revisa los campos marcados en rojo.";
+                return;
             }
-            
-            var jsonBody = JsonSerializer.Serialize(payload);
-            request.Content = new StringContent(jsonBody, System.Text.Encoding.UTF8, "application/json");
 
-            var response = await Http.SendAsync(request);
-
-            if (response.IsSuccessStatusCode)
+            var resultado = await CamisaService.GuardarAsync(datos, productoEdicion.Id);
+            mensaje = resultado.Mensaje;
+            if (resultado.Ok)
             {
-                mensaje = "¡Producto guardado exitosamente!";
                 mostrarFormulario = false;
                 await CargarProductosDesdeApi();
-            }
-            else
-            {
-                var errorBody = await response.Content.ReadAsStringAsync();
-                mensaje = $"Error de API ({(int)response.StatusCode}): {errorBody}";
             }
         }
         catch (Exception ex)
         {
-            mensaje = $"Error al guardar: {ex.Message}";
+            mensaje = ex.Message;
         }
     }
 
-    private void SolicitarConfirmacionEliminar(CamisaDTO prod)
+    private void SolicitarConfirmacionEliminar(CamisaSalidaDTO prod)
     {
         productoAEliminar = prod;
         mostrarModalConfirmacion = true;
@@ -522,37 +542,12 @@
         int idEliminar = productoAEliminar.Id;
         string nombreProd = productoAEliminar.Nombre;
 
-        try
-        {
-            var token = await ObtenerTokenSesion();
-
-            using var request = new HttpRequestMessage(HttpMethod.Delete, $"{ApiBaseUrl}/{idEliminar}");
-            if (!string.IsNullOrWhiteSpace(token))
-            {
-                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-            }
-
-            await Http.SendAsync(request);
-        }
-        catch { }
-
-        productos.RemoveAll(p => p.Id == idEliminar);
-        mensaje = $"Producto '{nombreProd}' eliminado de la lista.";
+        var resultado = await CamisaService.EliminarAsync(idEliminar);
+        mensaje = resultado.Ok ? $"Producto '{nombreProd}' eliminado." : resultado.Mensaje;
+        if (resultado.Ok)
+            await CargarProductosDesdeApi();
 
         mostrarModalConfirmacion = false;
         productoAEliminar = null;
-        StateHasChanged();
-    }
-
-    public class PageResponseWrapper
-    {
-        [JsonPropertyName("content")]
-        public List<CamisaDTO>? Content { get; set; }
-    }
-
-    public class PageResponseWrapperMarcas
-    {
-        [JsonPropertyName("content")]
-        public List<MarcaDTO>? Content { get; set; }
     }
 }
