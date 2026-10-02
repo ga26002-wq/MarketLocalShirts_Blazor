@@ -6,9 +6,9 @@
 
 <PageTitle>Mis Pedidos - MarketLocalShirts</PageTitle>
 
-<div class="bg-black text-white min-vh-100 py-5 px-3 px-md-5">
-    <div class="text-center mb-5">
-        <h1 class="fw-bold display-4 text-white">Mis Pedidos</h1>
+<div class="bg-black text-white min-vh-100 py-4 px-3">
+    <div class="text-center mb-4">
+        <h1 class="fw-bold text-white" style="font-size: 1.75rem;">Mis Pedidos</h1>
     </div>
 
     @if (listaPedidos == null)
@@ -37,22 +37,22 @@
     }
     else
     {
-        <div class="mx-auto" style="max-width: 900px;">
+        <div class="mx-auto" style="max-width: 640px;">
             @foreach (var pedido in listaPedidos)
             {
-                <div class="card bg-dark border border-secondary rounded-4 p-4 mb-4 shadow-lg">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
+                <div class="card bg-dark border border-secondary rounded-3 p-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
                         <div>
-                            <h3 class="fw-bold text-white mb-1">Pedido #@pedido.Id</h3>
-                            <p class="text-secondary mb-0">@pedido.Fecha.ToString("dd/MM/yyyy HH:mm")</p>
+                            <h2 class="fw-bold text-white mb-1" style="font-size: 1.05rem;">Pedido #@pedido.Id</h2>
+                            <p class="text-secondary mb-0 small">@pedido.Fecha.ToString("dd/MM/yyyy HH:mm")</p>
                         </div>
                         <div class="text-end">
-                            <span class="d-block fw-bold text-white fs-5">@pedido.EstadoTexto</span>
-                            <span class="text-info fw-bold fs-4">$@pedido.Total.ToString("F2")</span>
+                            <span class="d-block fw-bold text-white">@pedido.EstadoTexto</span>
+                            <span class="text-info fw-bold">$@pedido.Total.ToString("F2")</span>
                         </div>
                     </div>
 
-                    <div class="table-responsive mb-4">
+                    <div class="table-responsive mb-3">
                         <table class="table table-dark table-borderless align-middle mb-0">
                             <thead>
                                 <tr class="text-dark fw-bold" style="background-color: #d9d9d9;">
@@ -67,9 +67,9 @@
                                     @foreach (var detalle in pedido.Detalles)
                                     {
                                         <tr class="border-bottom border-secondary">
-                                            <td class="py-3 px-3 text-white">@detalle.NombreProducto</td>
-                                            <td class="py-3 px-3 text-center text-white">@detalle.Cantidad</td>
-                                            <td class="py-3 px-3 text-end text-white">$@detalle.SubTotal.ToString("F2")</td>
+                                            <td class="py-2 px-3 text-white">@detalle.NombreProducto</td>
+                                            <td class="py-2 px-3 text-center text-white">@detalle.Cantidad</td>
+                                            <td class="py-2 px-3 text-end text-white">$@detalle.SubTotal.ToString("F2")</td>
                                         </tr>
                                     }
                                 }
@@ -78,7 +78,7 @@
                     </div>
 
                     <div>
-                        <button class="btn fw-bold py-2 px-4 rounded-2 text-dark btn-factura"
+                        <button class="btn fw-semibold py-1 px-3 rounded-2 text-dark btn-factura"
                                 style="background-color: #00a8ff; border: none;"
                                 @onclick="() => VerFactura(pedido.Id)">
                             Ver Factura

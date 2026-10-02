@@ -6,10 +6,10 @@
 @using System.Text.Json.Serialization
 
 <div class="register-wrapper d-flex align-items-center justify-content-center bg-black text-white px-3 py-4" style="min-height: calc(100vh - 60px);">
-    <div class="card text-white p-4 shadow-lg border-0 rounded-3" style="max-width: 420px; width: 100%; background-color: #2b2b2b !important;">
-        <div class="text-center mb-3">
-            <h2 class="fw-bold fs-4 mb-1">Crear Cuenta</h2>
-            <p class="fs-6 text-light mb-0">Completa tus datos para registrarte.</p>
+    <div class="card text-white p-3 shadow-lg border-0 rounded-3" style="max-width: 360px; width: 100%; background-color: #2b2b2b !important;">
+        <div class="text-center mb-2">
+            <h2 class="fw-bold mb-1" style="font-size: 1.25rem;">Crear Cuenta</h2>
+            <p class="small text-light mb-0">Completa tus datos para registrarte.</p>
         </div>
 
         @if (!string.IsNullOrEmpty(errorMessage))
@@ -23,7 +23,7 @@
 
         <div class="form-group mb-2">
             <label class="form-label fw-bold mb-1 small">Nombre Completo</label>
-            <input type="text" class="form-control bg-light text-dark rounded-2 @(errores.ContainsKey("Nombre") ? "border border-danger" : "border-0")" @bind="registerModel.Nombre" placeholder="Tu nombre" />
+            <input type="text" class="form-control form-control-sm bg-light text-dark rounded-2 @(errores.ContainsKey("Nombre") ? "border border-danger" : "border-0")" @bind="registerModel.Nombre" placeholder="Tu nombre" />
             @if (errores.TryGetValue("Nombre", out var errorNombre))
             {
                 <div class="text-danger small fw-bold mt-1">@errorNombre</div>
@@ -32,7 +32,7 @@
 
         <div class="form-group mb-2">
             <label class="form-label fw-bold mb-1 small">Correo Electrónico</label>
-            <input type="email" class="form-control bg-light text-dark rounded-2 @(errores.ContainsKey("Email") ? "border border-danger" : "border-0")" @bind="registerModel.Email" placeholder="tucorreo@email.com" />
+            <input type="email" class="form-control form-control-sm bg-light text-dark rounded-2 @(errores.ContainsKey("Email") ? "border border-danger" : "border-0")" @bind="registerModel.Email" placeholder="tucorreo@email.com" />
             @if (errores.TryGetValue("Email", out var errorCorreo))
             {
                 <div class="text-danger small fw-bold mt-1">@errorCorreo</div>
@@ -41,7 +41,12 @@
 
         <div class="form-group mb-2">
             <label class="form-label fw-bold mb-1 small">Contraseña</label>
-            <input type="password" class="form-control bg-light text-dark rounded-2 @(errores.ContainsKey("Clave") ? "border border-danger" : "border-0")" @bind="registerModel.Clave" placeholder="••••••••" />
+            <div class="campo-clave">
+                <input type="@(verClave ? "text" : "password")" class="form-control bg-light text-dark rounded-2 @(errores.ContainsKey("Clave") ? "border border-danger" : "border-0")" @bind="registerModel.Clave" placeholder="••••••••" />
+                <button type="button" class="ojo-clave" @onclick="() => verClave = !verClave" title="@(verClave ? "Ocultar" : "Ver")">
+                    <i class="bi @(verClave ? "bi-eye-slash" : "bi-eye")"></i>
+                </button>
+            </div>
             @if (errores.TryGetValue("Clave", out var errorClave))
             {
                 <div class="text-danger small fw-bold mt-1">@errorClave</div>
@@ -50,7 +55,12 @@
 
         <div class="form-group mb-2">
             <label class="form-label fw-bold mb-1 small">Confirmar Contraseña</label>
-            <input type="password" class="form-control bg-light text-dark rounded-2 @(errores.ContainsKey("Confirmar") ? "border border-danger" : "border-0")" @bind="confirmarClave" placeholder="••••••••" />
+            <div class="campo-clave">
+                <input type="@(verConfirmar ? "text" : "password")" class="form-control bg-light text-dark rounded-2 @(errores.ContainsKey("Confirmar") ? "border border-danger" : "border-0")" @bind="confirmarClave" placeholder="••••••••" />
+                <button type="button" class="ojo-clave" @onclick="() => verConfirmar = !verConfirmar" title="@(verConfirmar ? "Ocultar" : "Ver")">
+                    <i class="bi @(verConfirmar ? "bi-eye-slash" : "bi-eye")"></i>
+                </button>
+            </div>
             @if (errores.TryGetValue("Confirmar", out var errorConfirmar))
             {
                 <div class="text-danger small fw-bold mt-1">@errorConfirmar</div>
@@ -59,14 +69,14 @@
 
         <div class="form-group mb-3">
             <label class="form-label fw-bold mb-1 small">Teléfono</label>
-            <input type="tel" class="form-control bg-light text-dark rounded-2 @(errores.ContainsKey("Telefono") ? "border border-danger" : "border-0")" @bind="registerModel.Telefono" placeholder="7000-0000" />
+            <input type="tel" class="form-control form-control-sm bg-light text-dark rounded-2 @(errores.ContainsKey("Telefono") ? "border border-danger" : "border-0")" @bind="registerModel.Telefono" placeholder="7000-0000" />
             @if (errores.TryGetValue("Telefono", out var errorTelefono))
             {
                 <div class="text-danger small fw-bold mt-1">@errorTelefono</div>
             }
         </div>
 
-        <button type="button" class="btn btn-info w-100 fw-bold text-white mb-3 rounded-2" style="background-color: #00a8ff; border: none; padding: 0.6rem;" @onclick="HandleRegister">
+        <button type="button" class="btn btn-info w-100 fw-semibold text-white mb-2 rounded-2" style="background-color: #00a8ff; border: none; padding: 0.4rem;" @onclick="HandleRegister">
             Crear Cuenta
         </button>
 
@@ -82,6 +92,8 @@
 @code {
     private RegisterModel registerModel = new();
     private string confirmarClave = string.Empty;
+    private bool verClave;
+    private bool verConfirmar;
     private string? errorMessage;
     private string? successMessage;
     private Dictionary<string, string> errores = new();
@@ -91,7 +103,9 @@
         errorMessage = null;
         successMessage = null;
         errores = ValidacionFormulario.Errores(registerModel);
-        if (registerModel.Clave != confirmarClave)
+        if (string.IsNullOrWhiteSpace(confirmarClave))
+            errores["Confirmar"] = "Debes confirmar la contraseña";
+        else if (registerModel.Clave != confirmarClave)
             errores["Confirmar"] = "Las contraseñas no coinciden.";
 
         if (errores.Count > 0)
@@ -140,7 +154,9 @@
         [JsonPropertyName("clave")]
         public string Clave { get; set; } = string.Empty;
 
-        [StringLength(20, ErrorMessage = "El telefono no debe superar 20 caracteres")]
+        [Required(ErrorMessage = "El teléfono es obligatorio")]
+        [StringLength(20, ErrorMessage = "El teléfono no debe superar 20 caracteres")]
+        [RegularExpression(@"^[0-9]{4}-[0-9]{4}$", ErrorMessage = "El teléfono debe tener el formato 7000-0000")]
         [JsonPropertyName("telefono")]
         public string Telefono { get; set; } = string.Empty;
     }

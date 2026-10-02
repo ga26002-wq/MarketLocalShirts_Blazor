@@ -14,25 +14,25 @@
         <!-- ========================================== -->
         <!--    VISTA 1: TABLA / LISTADO DE PRODUCTOS    -->
         <!-- ========================================== -->
-        <div class="d-flex justify-content-between align-items-center mb-5">
-            <h1 class="fw-bold display-3 m-0">Productos</h1>
-            <button class="btn btn-info text-white fw-bold px-4 py-3 fs-4 rounded-3" 
-                    style="background-color: #00a8ff; border: none; min-width: 160px;" 
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="fw-bold m-0" style="font-size: 1.75rem;">Productos</h1>
+            <button class="btn btn-info text-white fw-semibold px-3 py-2 rounded-2" 
+                    style="background-color: #00a8ff; border: none;" 
                     @onclick="AbrirFormularioNuevo">
                 + Nuevo
             </button>
         </div>
 
         <!-- Buscador -->
-        <div class="row justify-content-center mb-5">
-            <div class="col-md-8 d-flex gap-2">
+        <div class="row justify-content-center mb-4">
+            <div class="col-md-7 d-flex gap-2">
                 <input type="text" 
-                       class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                       class="form-control bg-secondary text-white border-0 py-2" 
                        placeholder="Buscar producto por nombre o marca..." 
                        @bind="criterioBusqueda" 
                        @bind:event="oninput" />
-                <button class="btn btn-info text-white fw-bold px-4 fs-5" 
-                        style="background-color: #00a8ff; border: none; min-width: 140px;"
+                <button class="btn btn-info text-white fw-semibold px-3 py-2" 
+                        style="background-color: #00a8ff; border: none; min-width: 96px;"
                         @onclick="FiltrarProductos">
                     Buscar
                 </button>
@@ -40,7 +40,7 @@
         </div>
 
         <!-- Encabezados -->
-        <div class="row text-white fw-bold fs-4 mb-3 px-3">
+        <div class="row text-white fw-semibold mb-2 px-3">
             <div class="col-md-4">Producto</div>
             <div class="col-md-2 text-center">Marca</div>
             <div class="col-md-2 text-center">Precio</div>
@@ -59,7 +59,7 @@
         }
         else if (productosFiltrados == null || !productosFiltrados.Any())
         {
-            <div class="text-center py-5 text-white-50 fs-4">
+            <div class="text-center py-4 text-white-50">
                 No hay productos registrados en la base de datos.
             </div>
         }
@@ -67,33 +67,33 @@
         {
             @foreach (var prod in productosFiltrados)
             {
-                <div class="row align-items-center bg-black py-3 mb-3 rounded border border-secondary px-3">
-                    <div class="col-md-4 d-flex align-items-center gap-3">
+                <div class="row align-items-center bg-black py-2 mb-2 rounded border border-secondary px-3">
+                    <div class="col-md-4 d-flex align-items-center gap-2">
                         <img src="@(string.IsNullOrEmpty(prod.ImagenUrl) ? "/camisa-polo.png" : prod.ImagenUrl)" 
                              alt="@prod.Nombre" 
-                             style="width: 70px; height: 70px; object-fit: contain; background: #fff;" 
+                             style="width: 42px; height: 42px; object-fit: contain; background: #fff;" 
                              class="rounded border" />
-                        <h4 class="fw-bold m-0 fs-4">@prod.Nombre</h4>
+                        <div class="fw-semibold m-0">@prod.Nombre</div>
                     </div>
 
-                    <div class="col-md-2 text-center fs-4 fw-bold text-capitalize">
+                    <div class="col-md-2 text-center fw-semibold text-capitalize">
                         @prod.NombreMarca
                     </div>
 
-                    <div class="col-md-2 text-center fs-4 fw-bold text-info">
+                    <div class="col-md-2 text-center fw-semibold text-info">
                         $@prod.Precio.ToString("F2")
                     </div>
 
-                    <div class="col-md-1 text-center fs-4 fw-bold">
+                    <div class="col-md-1 text-center fw-semibold">
                         @prod.Stock
                     </div>
 
                     <div class="col-md-3 d-flex justify-content-center gap-2">
-                        <button class="btn btn-warning text-dark fw-bold px-3 py-2 fs-5" 
+                        <button class="btn btn-sm btn-warning text-dark fw-semibold px-2" 
                                 @onclick="() => AbrirFormularioEditar(prod)">
                             Editar
                         </button>
-                        <button class="btn btn-danger text-white fw-bold px-3 py-2 fs-5" 
+                        <button class="btn btn-sm btn-danger text-white fw-semibold px-2" 
                                 @onclick="() => SolicitarConfirmacionEliminar(prod)">
                             Eliminar
                         </button>

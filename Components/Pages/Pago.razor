@@ -7,18 +7,17 @@
 
 <PageTitle>Pago - MarketLocalShirts</PageTitle>
 
-<div class="bg-black text-white min-vh-100 py-5 px-3 px-md-5">
-    <!-- Título Principal -->
-    <div class="text-center mb-4">
-        <h1 class="fw-bold display-4 text-white">Pago</h1>
-        <h3 class="fw-bold text-info">Total: $@totalGeneral.ToString("F2")</h3>
+<div class="pago-pagina">
+    <div class="pago-encabezado">
+        <h1>Pago</h1>
+        <p>Total: $@totalGeneral.ToString("F2")</p>
     </div>
 
-    <!-- Formulario de Pago Estilo Profesional -->
-    <div class="card bg-dark border border-secondary rounded-4 p-4 p-md-5 mx-auto shadow-lg" style="max-width: 650px;">
+    <div class="pago-panel">
+        <p class="pago-seccion">Entrega</p>
         <div class="mb-3">
-            <label class="form-label text-white fw-bold mb-1">Nombre</label>
-            <input type="text" class="form-control bg-secondary text-white p-3 rounded-2 @(errores.ContainsKey("Nombre") ? "border border-danger" : "border-0")" autocomplete="off" placeholder="Nombre completo" @bind="nombre" />
+            <label class="pago-label">Nombre</label>
+            <input type="text" class="form-control pago-input @(errores.ContainsKey("Nombre") ? "border border-danger" : "")" autocomplete="off" placeholder="Nombre completo" @bind="nombre" />
             @if (errores.TryGetValue("Nombre", out var errorNombre))
             {
                 <div class="text-danger fw-bold mt-1">@errorNombre</div>
@@ -26,30 +25,29 @@
         </div>
 
         <div class="mb-3">
-            <label class="form-label text-white fw-bold mb-1">Correo</label>
-            <input type="email" class="form-control bg-secondary text-white p-3 rounded-2 @(errores.ContainsKey("Correo") ? "border border-danger" : "border-0")" autocomplete="off" placeholder="correo@ejemplo.com" @bind="correo" />
+            <label class="pago-label">Correo</label>
+            <input type="email" class="form-control pago-input @(errores.ContainsKey("Correo") ? "border border-danger" : "")" autocomplete="off" placeholder="correo@ejemplo.com" @bind="correo" />
             @if (errores.TryGetValue("Correo", out var errorCorreo))
             {
                 <div class="text-danger fw-bold mt-1">@errorCorreo</div>
             }
         </div>
 
-        <div class="mb-4">
-            <label class="form-label text-white fw-bold mb-1">Direccion</label>
-            <input type="text" class="form-control bg-secondary text-white p-3 rounded-2 @(errores.ContainsKey("Direccion") ? "border border-danger" : "border-0")" autocomplete="off" placeholder="Dirección de entrega" @bind="direccion" />
+        <div class="mb-3">
+            <label class="pago-label">Direccion</label>
+            <input type="text" class="form-control pago-input @(errores.ContainsKey("Direccion") ? "border border-danger" : "")" autocomplete="off" placeholder="Dirección de entrega" @bind="direccion" />
             @if (errores.TryGetValue("Direccion", out var errorDireccion))
             {
                 <div class="text-danger fw-bold mt-1">@errorDireccion</div>
             }
         </div>
 
-        <hr class="border-secondary mb-4" />
-
-        <h4 class="fw-bold text-white mb-3">Tarjeta</h4>
+        <div class="pago-tarjeta">
+        <p class="pago-seccion mb-3">Tarjeta</p>
 
         <div class="mb-3">
-            <label class="form-label text-white fw-bold mb-1">Titular</label>
-            <input type="text" class="form-control bg-secondary text-white p-3 rounded-2 @(errores.ContainsKey("Titular") ? "border border-danger" : "border-0")" autocomplete="off" placeholder="Nombre en la tarjeta" @bind="titularTarjeta" />
+            <label class="pago-label">Titular</label>
+            <input type="text" class="form-control pago-input @(errores.ContainsKey("Titular") ? "border border-danger" : "")" autocomplete="off" placeholder="Nombre en la tarjeta" @bind="titularTarjeta" />
             @if (errores.TryGetValue("Titular", out var errorTitular))
             {
                 <div class="text-danger fw-bold mt-1">@errorTitular</div>
@@ -58,8 +56,8 @@
 
         <!-- Número de Tarjeta con formato automático de 4 en 4 -->
         <div class="mb-3">
-            <label class="form-label text-white fw-bold mb-1">Numero</label>
-            <input type="text" class="form-control bg-secondary text-white p-3 rounded-2 @(errores.ContainsKey("Numero") ? "border border-danger" : "border-0")" 
+            <label class="pago-label">Numero</label>
+            <input type="text" class="form-control pago-input @(errores.ContainsKey("Numero") ? "border border-danger" : "")" 
                    maxlength="19" 
                    autocomplete="off" 
                    placeholder="4444 4444 4444 4444" 
@@ -71,11 +69,11 @@
             }
         </div>
 
-        <div class="row g-3 mb-5">
+        <div class="row g-2">
             <div class="col-6">
-                <label class="form-label text-white fw-bold mb-1">Vence</label>
+                <label class="pago-label">Vence</label>
                 <!-- Vencimiento con formato automático MM/AA -->
-                <input type="text" class="form-control bg-secondary text-white p-3 rounded-2 text-center @(errores.ContainsKey("Vencimiento") ? "border border-danger" : "border-0")" 
+                <input type="text" class="form-control pago-input text-center @(errores.ContainsKey("Vencimiento") ? "border border-danger" : "")" 
                        maxlength="5" 
                        name="no-vence-field"
                        autocomplete="off" 
@@ -88,9 +86,9 @@
                 }
             </div>
             <div class="col-6">
-                <label class="form-label text-white fw-bold mb-1">CVV</label>
+                <label class="pago-label">CVV</label>
                 <!-- CVV limitado estrictamente a 3 dígitos -->
-                <input type="password" class="form-control bg-secondary text-white p-3 rounded-2 text-center @(errores.ContainsKey("Cvv") ? "border border-danger" : "border-0")" 
+                <input type="password" class="form-control pago-input text-center @(errores.ContainsKey("Cvv") ? "border border-danger" : "")" 
                        maxlength="3" 
                        name="no-cvv-field"
                        autocomplete="new-password" 
@@ -103,19 +101,11 @@
                 }
             </div>
         </div>
+        </div>
 
-        <!-- Botones de Acción -->
-        <div class="d-flex gap-3 justify-content-between">
-            <button class="btn w-50 fw-bold py-3 fs-5 rounded-2 text-dark btn-volver" 
-                    style="background-color: #00a8ff; border: none;"
-                    @onclick="VolverAlCarrito">
-                Volver
-            </button>
-            <button class="btn w-50 fw-bold py-3 fs-5 rounded-2 text-dark btn-pagar" 
-                    style="background-color: #00a8ff; border: none;"
-                    @onclick="ProcesarPagoFinal">
-                Pagar
-            </button>
+        <div class="pago-acciones">
+            <button class="btn btn-volver" @onclick="VolverAlCarrito">Volver</button>
+            <button class="btn btn-pagar" @onclick="ProcesarPagoFinal">Pagar</button>
         </div>
 
         @if (!string.IsNullOrEmpty(mensajeError))
@@ -128,9 +118,106 @@
 </div>
 
 <style>
-    .btn-pagar:hover, .btn-volver:hover {
-        background-color: #0084ff !important;
-        color: #fff !important;
+    .pago-pagina {
+        background: #000;
+        min-height: calc(100vh - 60px);
+        padding: 1.75rem 1rem 2.5rem;
+        color: #fff;
+    }
+
+    .pago-encabezado {
+        text-align: center;
+        margin-bottom: 1.25rem;
+    }
+
+    .pago-encabezado h1 {
+        font-size: 1.6rem;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .pago-encabezado p {
+        margin: 0.25rem 0 0;
+        color: #00a8ff;
+        font-weight: 700;
+    }
+
+    .pago-panel {
+        width: min(440px, 100%);
+        margin: 0 auto;
+        background: #1c1c1c;
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 1.25rem 1.25rem 1.1rem;
+    }
+
+    .pago-seccion {
+        margin: 0 0 0.75rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #9aa0a6;
+    }
+
+    .pago-label {
+        display: block;
+        margin-bottom: 0.3rem;
+        font-size: 0.88rem;
+        font-weight: 600;
+    }
+
+    .pago-input {
+        background: #2a2a2a;
+        color: #fff;
+        border: 1px solid #3a3a3a;
+        border-radius: 8px;
+        padding: 0.45rem 0.7rem;
+    }
+
+    .pago-input:focus {
+        background: #2a2a2a;
+        color: #fff;
+        border-color: #00a8ff;
+        box-shadow: none;
+    }
+
+    .pago-tarjeta {
+        margin-top: 0.4rem;
+        padding: 0.9rem 0.9rem 0.2rem;
+        border-radius: 10px;
+        background: linear-gradient(160deg, #243044 0%, #1a1f2b 55%, #161616 100%);
+        border: 1px solid #31445f;
+    }
+
+    .pago-acciones {
+        display: flex;
+        gap: 0.6rem;
+        margin-top: 1rem;
+    }
+
+    .btn-volver,
+    .btn-pagar {
+        flex: 1;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        font-weight: 600;
+    }
+
+    .btn-volver {
+        background: #2c2c2c;
+        color: #fff;
+    }
+
+    .btn-pagar {
+        background: #00a8ff;
+        color: #fff;
+    }
+
+    .btn-pagar:hover,
+    .btn-volver:hover {
+        filter: brightness(1.08);
     }
 </style>
 

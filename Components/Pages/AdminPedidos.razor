@@ -6,20 +6,20 @@
 
 <PageTitle>Administración de Pedidos - MarketLocalShirts</PageTitle>
 
-<div class="container my-5 text-white">
+<div class="container my-4 text-white">
     <!-- Título Principal Centrado -->
-    <h1 class="text-center mb-5 fw-bold display-3">Pedidos</h1>
+    <h1 class="text-center mb-3 fw-bold" style="font-size: 1.75rem;">Pedidos</h1>
 
     <!-- Buscador de Pedidos -->
-    <div class="row justify-content-center mb-5">
-        <div class="col-md-8 d-flex gap-2">
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-7 d-flex gap-2">
             <input type="text" 
-                   class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                   class="form-control bg-secondary text-white border-0 py-2" 
                    placeholder="Buscar por cliente, correo o # pedido..." 
                    @bind="criterioBusqueda" 
                    @bind:event="oninput" />
-            <button class="btn btn-info text-white fw-bold px-4 fs-5" 
-                    style="background-color: #00a8ff; border: none; min-width: 140px;"
+            <button class="btn btn-info text-white fw-semibold px-3 py-2" 
+                    style="background-color: #00a8ff; border: none; min-width: 96px;"
                     @onclick="FiltrarPedidos">
                 Buscar
             </button>
@@ -27,7 +27,7 @@
     </div>
 
     <!-- Encabezados de la Tabla (12 columnas organizadas) -->
-    <div class="row text-white fw-bold fs-4 mb-3 px-3">
+    <div class="row text-white fw-semibold mb-2 px-3">
         <div class="col-md-1">Pedido</div>
         <div class="col-md-4">Cliente</div>
         <div class="col-md-3">Fecha</div>
@@ -46,7 +46,7 @@
     }
     else if (pedidosFiltrados == null || !pedidosFiltrados.Any())
     {
-        <div class="text-center py-5 text-white-50 fs-4 bg-black rounded border border-secondary">
+        <div class="text-center py-4 text-white-50 bg-black rounded border border-secondary">
             No se encontraron pedidos registrados.
         </div>
     }
@@ -54,31 +54,31 @@
     {
         @foreach (var ped in pedidosFiltrados)
         {
-            <div class="row align-items-center bg-black py-3 mb-3 rounded border border-secondary px-3">
+            <div class="row align-items-center bg-black py-2 mb-2 rounded border border-secondary px-3">
                 <!-- Columna 1: # ID del Pedido -->
-                <div class="col-md-1 fs-3 fw-bold">
+                <div class="col-md-1 fw-bold">
                     #@ped.Id
                 </div>
 
                 <!-- Columna 2: Nombre y Correo del Cliente -->
                 <div class="col-md-4">
-                    <h4 class="fw-bold m-0 fs-4">@ObtenerNombreCliente(ped)</h4>
-                    <p class="text-white-50 m-0 fs-5">@ObtenerEmailCliente(ped)</p>
+                    <div class="fw-semibold m-0">@ObtenerNombreCliente(ped)</div>
+                    <p class="text-white-50 m-0 small">@ObtenerEmailCliente(ped)</p>
                 </div>
 
                 <!-- Columna 3: Fecha del Pedido -->
-                <div class="col-md-3 fs-5 fw-semibold">
+                <div class="col-md-3">
                     <div>@ped.FechaFormatted</div>
                 </div>
 
                 <!-- Columna 4: Estado -->
-                <div class="col-md-2 fs-4 fw-bold text-uppercase">
+                <div class="col-md-2 fw-semibold text-uppercase">
                     @ped.Estado
                 </div>
 
                 <!-- Columna 5: Botón Editar Estado perfectamente alineado -->
                 <div class="col-md-2 text-end">
-                    <button class="btn btn-info text-dark fw-bold px-3 py-2 fs-5" 
+                    <button class="btn btn-sm btn-info text-dark fw-semibold px-2" 
                             style="background-color: #00a8ff; border: none; color: #000 !important;"
                             @onclick="() => AbrirModalEditarEstado(ped)">
                         Editar Estado

@@ -5,14 +5,14 @@
 
 <PageTitle>Administración de Usuarios - MarketLocalShirts</PageTitle>
 
-<div class="container my-5 text-white">
-    <h1 class="text-center mb-4 fw-bold display-3">Usuarios</h1>
+<div class="container my-4 text-white">
+    <h1 class="text-center mb-3 fw-bold" style="font-size: 1.75rem;">Usuarios</h1>
 
     @if (!string.IsNullOrEmpty(mensaje))
     {
         <div class="row mb-4">
             <div class="col-12 text-center">
-                <div class="alert @(esError ? "alert-danger" : "alert-success") d-inline-block px-4 py-3 fs-5" role="alert">
+                <div class="alert @(esError ? "alert-danger" : "alert-success") d-inline-block px-3 py-2" role="alert">
                     @mensaje
                 </div>
             </div>
@@ -20,15 +20,15 @@
     }
 
     <!-- Buscador de Usuarios -->
-    <div class="row justify-content-center mb-5">
-        <div class="col-md-8 d-flex gap-2">
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-7 d-flex gap-2">
             <input type="text" 
-                   class="form-control bg-secondary text-white border-0 fs-5 p-3" 
+                   class="form-control bg-secondary text-white border-0 py-2" 
                    placeholder="Buscar usuario..." 
                    @bind="criterioBusqueda" 
                    @bind:event="oninput" />
-            <button class="btn btn-info text-white fw-bold px-4 fs-5" 
-                    style="min-width: 140px;"
+            <button class="btn btn-info text-white fw-semibold px-3 py-2" 
+                    style="min-width: 96px;"
                     @onclick="BuscarUsuarios">
                 Buscar
             </button>
@@ -36,7 +36,7 @@
     </div>
 
     <!-- Encabezados de la Lista -->
-    <div class="row text-white fw-bold fs-4 mb-3 px-3">
+    <div class="row text-white fw-semibold mb-2 px-3">
         <div class="col-md-4">Usuarios</div>
         <div class="col-md-2 text-center">Rol</div>
         <div class="col-md-2 text-center">Estado</div>
@@ -46,13 +46,13 @@
     <!-- Filas de Usuarios -->
     @if (cargando)
     {
-        <div class="text-center py-5 text-info fs-4">
+        <div class="text-center py-4 text-info">
             Cargando usuarios desde la base de datos...
         </div>
     }
     else if (usuarios == null || !usuarios.Any())
     {
-        <div class="text-center py-5 text-muted fs-4">
+        <div class="text-center py-4 text-muted">
             No se encontraron usuarios registrados.
         </div>
     }
@@ -62,36 +62,36 @@
         {
             bool esAdmin = IsAdminRol(usr.Rol);
 
-            <div class="row align-items-center bg-black py-3 mb-3 rounded border border-secondary px-3">
+            <div class="row align-items-center bg-black py-2 mb-2 rounded border border-secondary px-3">
                 <!-- Nombre y Correo -->
                 <div class="col-md-4">
-                    <h4 class="fw-bold m-0 fs-4">@usr.Nombre</h4>
-                    <p class="text-white-50 m-0 fs-5">@usr.Correo</p>
+                    <div class="fw-bold m-0">@usr.Nombre</div>
+                    <p class="text-white-50 m-0 small">@usr.Correo</p>
                 </div>
 
                 <!-- Rol -->
-                <div class="col-md-2 text-center fs-4 fw-bold">
+                <div class="col-md-2 text-center fw-semibold">
                     @(esAdmin ? "Admin" : "Cliente")
                 </div>
 
                 <!-- Estado -->
-                <div class="col-md-2 text-center fs-4 fw-bold @(usr.Activo == false ? "text-danger" : "text-success")">
+                <div class="col-md-2 text-center fw-semibold @(usr.Activo == false ? "text-danger" : "text-success")">
                     @(usr.Activo == false ? "Suspendido" : "Activo")
                 </div>
 
                 <!-- Acciones -->
                 <div class="col-md-4 d-flex justify-content-center gap-2">
-                    <button class="btn @(esAdmin ? "btn-warning text-dark" : "btn-info text-white") fw-bold px-3 py-2 fs-5"
+                    <button class="btn btn-sm @(esAdmin ? "btn-warning text-dark" : "btn-info text-white") fw-semibold px-2"
                             @onclick="() => CambiarRol(usr)">
                         @(esAdmin ? "Cliente" : "Admin")
                     </button>
 
-                    <button class="btn btn-light text-dark fw-bold px-3 py-2 fs-5"
+                    <button class="btn btn-sm btn-light text-dark fw-semibold px-2"
                             @onclick="() => CambiarEstado(usr)">
                         @(usr.Activo == false ? "Activar" : "Suspender")
                     </button>
 
-                    <button class="btn btn-light text-dark fw-bold px-3 py-2 fs-5"
+                    <button class="btn btn-sm btn-light text-dark fw-semibold px-2"
                             @onclick="() => AbrirClave(usr)">
                         Clave
                     </button>
